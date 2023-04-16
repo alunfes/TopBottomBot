@@ -18,7 +18,9 @@ class AccountData:
         cls.holding_timestamp = []
         cls.holding_period = []
         cls.holding_unrealized_pnl_usd = []
-        cls.holding_unrealized_pnl_percentage = []
+        cls.holding_unrealized_pnl_ratio = []
+        cls.holding_liquidation_price = []
+        cls.holding_margin_ratio = []
         #init order
         cls.order_ex_name = []
         cls.order_id = []
@@ -26,12 +28,23 @@ class AccountData:
         cls.order_side = []
         cls.order_type = []
         cls.order_price = []
+        cls.order_avg_price = []
         cls.order_status = []
         cls.order_original_qty = []
         cls.order_executed_qty = []
         cls.order_fee = []
         cls.order_fee_currency = []
         cls.order_ts = []
+        #performance
+        cls.num_trade = 0
+        cls.num_win = 0
+        cls.total_realized_pnl = 0
+        cls.total_unrealized_pnl = 0
+        cls.total_fee = 0
+        #log
+        cls.total_pnl_log = []
+        cls.trades_df = [] #[{ex_name, symbol, entry_price, entry_qty, entry_timestamp, exit_price, exit_timestamp, realzied_pnl}]
+
         
     
     @classmethod
@@ -46,7 +59,9 @@ class AccountData:
                 'timestamp':cls.holding_timestamp, 
                 'period':cls.holding_period, 
                 'unrealized_pnl_usd':cls.holding_unrealized_pnl_usd, 
-                'unrealized_pnl_percentage':cls.holding_unrealized_pnl_percentage
+                'unrealized_pnl_ratio':cls.holding_unrealized_pnl_ratio,
+                'liquidation_price': cls.holding_liquidation_price,
+                'margin_ratio': cls.holding_margin_ratio
                 })
     
     @classmethod
@@ -59,6 +74,7 @@ class AccountData:
                 'side': cls.order_side, 
                 'type': cls.order_type, 
                 'price': cls.order_price, 
+                'avg_price': cls.order_avg_price,
                 'status': cls.order_status, 
                 'original_qty': cls.order_original_qty, 
                 'executed_qty': cls.order_executed_qty,
@@ -68,7 +84,7 @@ class AccountData:
             })
     
     @classmethod
-    def add_order(cls, ex_name, id, symbol, side, type, price, status, original_qty, executed_qty, fee, fee_currency, timestamp):
+    def add_order(cls, ex_name, id, symbol, side, type, price, avg_price, status, original_qty, executed_qty, fee, fee_currency, timestamp):
         with cls.lock:
             cls.order_ex_name.append(ex_name)
             cls.order_id.append(id)
@@ -76,6 +92,7 @@ class AccountData:
             cls.order_side.append(side)
             cls.order_type.append(type)
             cls.order_price.append(price)
+            cls.order_avg_price.append(avg_price)
             cls.order_status.append(status)
             cls.order_original_qty.append(original_qty)
             cls.order_executed_qty.append(executed_qty)
@@ -84,7 +101,7 @@ class AccountData:
             cls.order_ts.append(timestamp)
     
     @classmethod
-    def add_holding(cls, ex_name, symbol, side, price, qty, timestamp, period, unrealized_pnl_usd, unrealized_pnl_percentage):
+    def add_holding(cls, ex_name, symbol, side, price, qty, timestamp, period, unrealized_pnl_usd, unrealized_pnl_ratio, liquidation_price, margin_ratio):
         with cls.lock:
             cls.holding_ex_name.append(ex_name)
             cls.holding_symbol.append(symbol)
@@ -94,7 +111,9 @@ class AccountData:
             cls.holding_timestamp.append(timestamp)
             cls.holding_period.append(period)
             cls.holding_unrealized_pnl_usd.append(unrealized_pnl_usd)
-            cls.holding_unrealized_pnl_percentage.append(unrealized_pnl_percentage)
+            cls.holding_unrealized_pnl_ratio.append(unrealized_pnl_ratio)
+            cls.holding_liquidation_price.append(liquidation_price)
+            cls.holding_margin_ratio.append(margin_ratio)
 
     @classmethod
     def remove_order(cls, order_id):
@@ -107,6 +126,7 @@ class AccountData:
                 cls.order_side.pop(idx)
                 cls.order_type.pop(idx)
                 cls.order_price.pop(idx)
+                cls.order_avg_price.pop(idx)
                 cls.order_status.pop(idx)
                 cls.order_original_qty.pop(idx)
                 cls.order_executed_qty.pop(idx)
@@ -129,12 +149,14 @@ class AccountData:
                 cls.holding_timestamp.pop(idx)
                 cls.holding_period.pop(idx)
                 cls.holding_unrealized_pnl_usd.pop(idx)
-                cls.holding_unrealized_pnl_percentage.pop(idx)
+                cls.holding_unrealized_pnl_ratio.pop(idx)
+                cls.holding_liquidation_price.pop(idx)
+                cls.holding_margin_ratio.pop(idx)
             except ValueError:
                 print(f"Holding for symbol {symbol} not found.")
 
     @classmethod
-    def update_order(cls, order_id, ex_name=None, symbol=None, side=None, type=None, price=None, status=None, original_qty=None, executed_qty=None, fee=None, fee_currency=None):
+    def update_order(cls, order_id, ex_name=None, symbol=None, side=None, type=None, price=None, avg_price=None, status=None, original_qty=None, executed_qty=None, fee=None, fee_currency=None):
         with cls.lock:
             try:
                 idx = cls.order_id.index(order_id)
@@ -148,6 +170,8 @@ class AccountData:
                     cls.order_type[idx] = type
                 if price is not None:
                     cls.order_price[idx] = price
+                if avg_price is not None:
+                    cls.order_avg_price[idx] = avg_price
                 if status is not None:
                     cls.order_status[idx] = status
                 if original_qty is not None:
@@ -162,7 +186,7 @@ class AccountData:
                 print(f"Order ID {order_id} not found.")
 
     @classmethod
-    def update_holding(cls, symbol, ex_name=None, side=None, price=None, qty=None, timestamp=None, period=None, unrealized_pnl_usd=None, unrealized_pnl_percentage=None):
+    def update_holding(cls, symbol, ex_name=None, side=None, price=None, qty=None, timestamp=None, period=None, unrealized_pnl_usd=None, unrealized_pnl_ratio=None, liquidation_price=None, margin_ratio=None):
         with cls.lock:
             try:
                 idx = cls.holding_symbol.index(symbol)
@@ -180,12 +204,85 @@ class AccountData:
                     cls.holding_period[idx] = period
                 if unrealized_pnl_usd is not None:
                     cls.holding_unrealized_pnl_usd[idx] = unrealized_pnl_usd
-                if unrealized_pnl_percentage is not None:
-                    cls.holding_unrealized_pnl_percentage[idx] = unrealized_pnl_percentage
+                if unrealized_pnl_ratio is not None:
+                    cls.holding_unrealized_pnl_ratio[idx] = unrealized_pnl_ratio
+                if liquidation_price is not None:
+                    cls.holding_liquidation_price[idx] = liquidation_price
+                if margin_ratio is not None:
+                    cls.holding_margin_ratio[idx] = margin_ratio
             except ValueError:
                 print(f"Holding for symbol {symbol} not found.")
 
 
+    @classmethod
+    def get_num_trade(cls):
+        with cls.lock:
+            return cls.num_trade
+
+    @classmethod
+    def set_num_trade(cls, value):
+        with cls.lock:
+            cls.num_trade = value
+
+    @classmethod
+    def get_num_win(cls):
+        with cls.lock:
+            return cls.num_win
+
+    @classmethod
+    def set_num_win(cls, value):
+        with cls.lock:
+            cls.num_win = value
+
+    @classmethod
+    def get_total_realized_pnl(cls):
+        with cls.lock:
+            return cls.total_realized_pnl
+
+    @classmethod
+    def set_total_realized_pnl(cls, value):
+        with cls.lock:
+            cls.total_realized_pnl = value
+
+    @classmethod
+    def get_total_unrealized_pnl(cls):
+        with cls.lock:
+            return cls.total_unrealized_pnl
+
+    @classmethod
+    def set_total_unrealized_pnl(cls, value):
+        with cls.lock:
+            cls.total_unrealized_pnl = value
+
+    @classmethod
+    def get_total_fee(cls):
+        with cls.lock:
+            return cls.total_fee
+
+    @classmethod
+    def set_total_fee(cls, value):
+        with cls.lock:
+            cls.total_fee = value
+
+    @classmethod
+    def get_total_pnl_log(cls):
+        with cls.lock:
+            return cls.total_pnl_log
+
+    @classmethod
+    def set_total_pnl_log(cls, value):
+        with cls.lock:
+            cls.total_pnl_log = value
+
+    @classmethod
+    def get_trades_df(cls):
+        with cls.lock:
+            return cls.trades_df
+
+    @classmethod
+    def set_trades_df(cls, value):
+        with cls.lock:
+            cls.trades_df = value
 
         
 

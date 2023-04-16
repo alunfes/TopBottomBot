@@ -39,17 +39,15 @@ class CCXTRestApiParser:
         18  df153856-c4eb-464d-a6d8-a0c90b71ffd8        OP/USDT:USDT    closed     2.219300   buy  ...           1.0 NaN  0.000222          USDT   bybit
         19  f8c8e4f8-8080-4c76-b0b7-9137e830f169        OP/USDT:USDT      open     2.000000   buy  ...           0.0 NaN  0.000000          USDT   bybit
         """
-        
         # リストから必要な情報を取り出して辞書型のリストを作成する
         orders = []
         for d in all_orders:
-            order = {'id': d['id'], 'symbol': d['symbol'], 'status': d['status'], 'price': d['price'], 'type':d['type'],
-                    'side': d['side'], 'original_qty': d['amount'], 'executed_qty': d['filled'],
-                    'timestamp': pd.to_datetime(d['timestamp'], unit='ms'), 'fee': d['fee']['cost'], 'fee_currency': d['fee']['currency']}
+            order = {'id': d['id'], 'symbol': d['symbol'], 'status': d['status'], 'price': float(d['price']),'avg_price': float(d['average']), 'type':d['type'],
+                    'side': d['side'], 'original_qty': float(d['amount']), 'executed_qty': float(d['filled']),
+                    'timestamp': pd.to_datetime(d['timestamp'], unit='ms'), 'fee': float(d['fee']['cost']), 'fee_currency': d['fee']['currency']}
             orders.append(order)
-        
         # 辞書型のリストからdataframeを作成する
-        df = pd.DataFrame(orders, columns=['id', 'symbol', 'status', 'price', 'side', 'type',
+        df = pd.DataFrame(orders, columns=['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type',
                                         'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency'])
         df['ex_name'] = [ex_name] * len(df)
         return df
@@ -58,7 +56,7 @@ class CCXTRestApiParser:
     @classmethod
     def parse_get_all_orders_okx(cls, open_orders, closed_orders):
         '''
-                        id         symbol  status    price  side  original_qty  executed_qty      timestamp      fee fee_currency ex_name
+                        id         symbol  status    price  side  original_qty  executed_qty      ts      fee fee_currency ex_name
         0  566288611784986625      DOGE/USDT  closed  0.08185   buy          10.0          10.0  1681285726183  0.00800         DOGE     okx
         1  566291942305632275      DOGE/USDT  closed  0.08200  sell          10.0          10.0  1681286520241  0.00082         USDT     okx
         2  566646923047145473  DOT/USDT:USDT    open  6.00000   buy           1.0           0.0  1681371154245  0.00000         USDT     okx
@@ -69,16 +67,17 @@ class CCXTRestApiParser:
             id = item['id']
             symbol = item['symbol']
             status = item['status']
-            price = item['price']
+            price = float(item['price'])
+            avg_price = float(item['avgPx']) if item['avgPx'] != ''  else 0.0
             side = item['side']
             otype = item['type']
-            original_qty = item['amount']
-            executed_qty = item['filled']
+            original_qty = float(item['amount'])
+            executed_qty = float(item['filled'])
             timestamp = item['timestamp']
-            fee = item['fee']['cost']
+            fee = float(item['fee']['cost'])
             fee_currency = item['fee']['currency']
-            processed_data.append([id, symbol, status, price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
-        columns = ['id', 'symbol', 'status', 'price', 'side', 'type', 'original_qty', 'executed_qty', 'timestamp', 'fee', 'fee_currency']
+            processed_data.append([id, symbol, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
+        columns = ['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
         closed_orders_df = pd.DataFrame(processed_data, columns=columns)
         closed_orders_df['ex_name'] = ['okx'] * len(closed_orders_df)
         # open_ordersからDataFrameを作成
@@ -87,16 +86,17 @@ class CCXTRestApiParser:
             id = item['id']
             symbol = item['symbol']
             status = item['status']
-            price = item['price']
+            price = float(item['price'])
+            avg_price = float(item['avgPx']) if item['avgPx'] != ''  else 0.0
             side = item['side']
             otype = item['type']
-            original_qty = item['amount']
-            executed_qty = item['filled']
+            original_qty = float(item['amount'])
+            executed_qty = float(item['filled'])
             timestamp = item['timestamp']
-            fee = item['fee']['cost']
+            fee = float(item['fee']['cost'])
             fee_currency = item['fee']['currency']
-            processed_data.append([id, symbol, status, price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
-        columns = ['id', 'symbol', 'status', 'price', 'side', 'type', 'original_qty', 'executed_qty', 'timestamp', 'fee', 'fee_currency']
+            processed_data.append([id, symbol, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
+        columns = ['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
         open_orders_df = pd.DataFrame(processed_data, columns=columns)
         open_orders_df['ex_name'] = ['okx'] * len(open_orders_df)
         return pd.concat([closed_orders_df, open_orders_df], ignore_index=True)
@@ -116,8 +116,14 @@ class CCXTRestApiParser:
         '''
         order_df = pd.DataFrame(all_orders)
         trade_df = pd.DataFrame(binace_trades)
-        order_cols = ['orderId', 'symbol', 'status', 'price', 'side', 'type', 'origQty', 'executedQty', 'time']
+        order_cols = ['orderId', 'symbol', 'status', 'price', 'avgPrice', 'side', 'type', 'origQty', 'executedQty', 'time']
         order_df = pd.DataFrame(order_df, columns=order_cols)
+        order_df = order_df['price'].astype(float)
+        order_df = order_df['avgPrice'].astype(float)
+        order_df = order_df['origQty'].astype(float)
+        order_df = order_df['executedQty'].astype(float)
+        order_df = order_df['side'].str.lower()
+        order_df = order_df['status'].str.lower()
         fees = []
         fee_currency = []
         for i in range(len(order_df)):
@@ -127,17 +133,95 @@ class CCXTRestApiParser:
                 fees.append(float(commision))
                 fee_currency.append(currency)
             else:
-                fees.append(0)
+                fees.append(0.0)
                 fee_currency.append('')
         order_df['fee'] = fees
         order_df['fee_currency'] = fee_currency
         order_df['ex_name'] = ['binance'] * len(order_df)
-        order_df.rename(columns={'orderId': 'id', 'origQty': 'original_qty', 'executedQty': 'executed_qty', 'time': 'ts'}, inplace=True)
+        order_df.rename(columns={'orderId': 'id', 'avgPrice': 'avg_price', 'origQty': 'original_qty', 'executedQty': 'executed_qty', 'time': 'ts'}, inplace=True)
         return order_df
 
 
-
     
+    @classmethod
+    def parse_fetch_position_binance(cls, binance_position):
+        '''
+               symbol   side    price    qty     timestamp  unrealized_pnl  unrealized_pnl_ratio  liquidation_price  margin_ratio
+        22  TRX/USDT:USDT  short  0.06381  100.0  1.681288e+12       -0.216356                -65.58           1.056954        0.0004
+        '''
+        # 必要なカラムを用意
+        columns = ['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio']
+        # カラムに対応する値を格納するリストを作成
+        records = []
+        for d in binance_position:
+            symbol = d['symbol']
+            side = d['side']
+            price = float(d['entryPrice'])
+            qty = float(d['contracts'])
+            timestamp = d['timestamp']
+            unrealized_pnl = float(d['unrealizedPnl'])
+            unrealized_pnl_ratio = float(d['percentage'])
+            liquidation_price = float(d['liquidationPrice'])
+            margin_ratio = float(d['marginRatio'])
+            # 各行の値をタプルとしてリストに追加
+            records.append((symbol, side, price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio))
+        # リストからデータフレームを作成
+        df = pd.DataFrame(records, columns=columns)
+        return df[df['side'].notnull()]
+    
+    
+
+    @classmethod
+    def parse_fetch_position_bybit(cls, bybit_positions):
+        '''
+        [{'info': {'positionIdx': '0', 'riskId': '1', 'riskLimitValue': '200000', 'symbol': 'OPUSDT', 'side': 'Buy', 'size': '1.0', 'avgPrice': '2.6123', 'positionValue': '2.6123', 'tradeMode': '0', 'positionStatus': 'Normal', 'autoAddMargin': '0', 'adlRankIndicator': '2', 'leverage': '10', 'markPrice': '2.6125', 'liqPrice': '0.0001', 'bustPrice': '0.0001', 'positionMM': '0.000001', 'positionIM': '0.052246', 'tpslMode': 'Full', 'takeProfit': '0.0000', 'stopLoss': '0.0000', 'trailingStop': '0.0000', 'unrealisedPnl': '0.0002', 'cumRealisedPnl': '-0.0015809', 'createdTime': '1681266516015', 'updatedTime': '1681448615072'}, 'id': None, 'symbol': 'OP/USDT:USDT', 'timestamp': 1681448615072, 'datetime': '2023-04-14T05:03:35.072Z', 'lastUpdateTimestamp': None, 'initialMargin': 0.26123, 'initialMarginPercentage': 0.1, 'maintenanceMargin': 0.0, 'maintenanceMarginPercentage': 0.0, 'entryPrice': 2.6123, 'notional': 2.6123, 'leverage': 10.0, 'unrealizedPnl': 0.0002, 'contracts': 1.0, 'contractSize': 1.0, 'marginRatio': None, 'liquidationPrice': 0.0001, 'markPrice': 2.6125, 'lastPrice': None, 'collateral': None, 'marginMode': 'cross', 'side': 'long', 'percentage': None}]
+            symbol  side   price  qty      timestamp  unrealized_pnl_usd unrealized_pnl_ratio  liquidation_price margin_ratio
+        0  OP/USDT:USDT  long  2.6123  1.0  1681448615072          0.0095                 None             0.0001         None
+        '''
+        # データを整形
+        formatted_data = []
+        for item in bybit_positions:
+            entry_price = item['entryPrice']
+            price = item['markPrice']
+            unrealized_pnl_ratio = (price - entry_price) / entry_price if item['side'] == 'long' else (entry_price - price) / entry_price
+            formatted_data.append({
+                'symbol': item['symbol'],
+                'side': item['side'],
+                'price': float(item['entryPrice']),
+                'qty': float(item['contracts']),
+                'timestamp': item['timestamp'],
+                'unrealized_pnl_usd': float(item['unrealizedPnl']),
+                'unrealized_pnl_ratio': float(unrealized_pnl_ratio),
+                'liquidation_price': float(item['liquidationPrice']),
+                'margin_ratio': float(item['marginRatio']) if item['marginRatio'] != None else None,
+            })
+        # データフレームを生成
+        df = pd.DataFrame(formatted_data, columns=['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+        return df
+
+
+    @classmethod
+    def parse_fetch_position_okx(cls, okx_position):
+        '''
+            symbol  side  price  qty      timestamp  unrealized_pnl  unrealized_pnl_ratio liquidation_price  margin_ratio
+        0  DOT/USDT:USDT  long  6.793  1.0  1681453967915          -0.009             -0.132314              None     -0.397468
+        '''
+        records = []
+        for d in okx_position:
+            symbol = d['symbol']
+            side = d['side']
+            price = float(d['info']['markPx'])
+            qty = float(d['info']['pos'])
+            timestamp = d['timestamp']
+            unrealized_pnl = float(d['unrealizedPnl'])
+            entry_price = float(d['info']['avgPx'])
+            # Calculate unrealized_pnl_ratio
+            unrealized_pnl_ratio = (price - entry_price) / entry_price if side == 'long' else (entry_price - price) / entry_price
+            margin_ratio = float(d['info']['mgnRatio'])
+            liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice']!=None else None
+            records.append([symbol, side, entry_price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio])
+        df = pd.DataFrame(records, columns=['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+        return df
 
 
 

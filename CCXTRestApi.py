@@ -23,7 +23,7 @@ API classでは単純にccxtのwrapperとしての役割に限定して、
 '''
 class CCXTRestApi:
     __instance = None
-    
+
     def __new__(cls):
         if cls.__instance is None:
             cls.__instance = super().__new__(cls)
@@ -211,13 +211,23 @@ class CCXTRestApi:
     async def fetch_holding_position(self, ex_name):
         '''
         実際にポジション持っている時のデータを取る必要がある、col=symbolで該当するもののポジションを取ることができる。
-        binance: info	id	symbol	contracts	contractSize	unrealizedPnl	leverage	liquidationPrice	collateral	notional	markPrice	entryPrice	timestamp	initialMargin	initialMarginPercentage	maintenanceMargin	maintenanceMarginPercentage	marginRatio	datetime	marginMode	marginType	side	hedged	percentage
+        binance:
+
         bybit:
         [{'info': {'positionIdx': '0', 'riskId': '1', 'riskLimitValue': '200000', 'symbol': 'OPUSDT', 'side': 'Sell', 'size': '1.0', 'avgPrice': '2.22072', 'positionValue': '2.22072', 'tradeMode': '0', 'positionStatus': 'Normal', 'autoAddMargin': '0', 'adlRankIndicator': '2', 'leverage': '10', 'markPrice': '2.2209', 'liqPrice': '199.9998', 'bustPrice': '199.9998', 'positionMM': '1.999998', 'positionIM': '0.0444144', 'tpslMode': 'Full', 'takeProfit': '0.0000', 'stopLoss': '0.0000', 'trailingStop': '0.0000', 'unrealisedPnl': '-0.00018', 'cumRealisedPnl': '-0.00133244', 'createdTime': '1681266516015', 'updatedTime': '1681285869080'}, 'id': None, 'symbol': 'OP/USDT:USDT', 'timestamp': 1681285869080, 'datetime': '2023-04-12T07:51:09.080Z', 'lastUpdateTimestamp': None, 'initialMargin': 0.222072, 'initialMarginPercentage': 0.1, 'maintenanceMargin': 0.0, 'maintenanceMarginPercentage': 0.0, 'entryPrice': 2.22072, 'notional': 2.22072, 'leverage': 10.0, 'unrealizedPnl': -0.00018, 'contracts': 1.0, 'contractSize': 1.0, 'marginRatio': None, 'liquidationPrice': 199.9998, 'markPrice': 2.2209, 'lastPrice': None, 'collateral': None, 'marginMode': 'cross', 'side': 'short', 'percentage': None}]
         okx:
         [{'info': {'adl': '1', 'availPos': '', 'avgPx': '0.081858', 'baseBal': '', 'baseBorrowed': '', 'baseInterest': '', 'bizRefId': '', 'bizRefType': '', 'cTime': '1681285189515', 'ccy': 'USDT', 'closeOrderAlgo': [], 'deltaBS': '', 'deltaPA': '', 'gammaBS': '', 'gammaPA': '', 'imr': '273.03333333333336', 'instId': 'DOGE-USDT-SWAP', 'instType': 'SWAP', 'interest': '', 'last': '0.08191', 'lever': '3', 'liab': '', 'liabCcy': '', 'liqPx': '0.1794956615280094', 'margin': '', 'markPx': '0.08191', 'mgnMode': 'cross', 'mgnRatio': '115.65585107929144', 'mmr': '8.190999999999999', 'notionalUsd': '819.5259320000001', 'optVal': '', 'pendingCloseOrdLiabVal': '', 'pos': '-10', 'posCcy': '', 'posId': '566286360836247552', 'posSide': 'net', 'quoteBal': '', 'quoteBorrowed': '', 'quoteInterest': '', 'spotInUseAmt': '', 'spotInUseCcy': '', 'thetaBS': '', 'thetaPA': '', 'tradeId': '224719298', 'uTime': '1681285189515', 'upl': '-0.5199999999999649', 'uplRatio': '-0.0019057392069195', 'usdPx': '', 'vegaBS': '', 'vegaPA': ''}, 'id': None, 'symbol': 'DOGE/USDT:USDT', 'notional': 819.5259320000001, 'marginMode': 'cross', 'liquidationPrice': 0.1794956615280094, 'entryPrice': 0.081858, 'unrealizedPnl': -0.5199999999999649, 'percentage': -0.19057392069195, 'contracts': 10.0, 'contractSize': 1000.0, 'markPrice': 0.08191, 'lastPrice': None, 'side': 'short', 'hedged': False, 'timestamp': 1681285189515, 'datetime': '2023-04-12T07:39:49.515Z', 'lastUpdateTimestamp': None, 'maintenanceMargin': 8.190999999999999, 'maintenanceMarginPercentage': 0.01, 'collateral': 272.5133333333334, 'initialMargin': 273.03333333333336, 'initialMarginPercentage': 0.3331, 'leverage': 3.0, 'marginRatio': 0.03}]
         '''
-        res = await self.ccxt_exchanges[ex_name].fetch_positions()
+        if ex_name == 'binance':
+            #res = await self.ccxt_exchanges['binance'].fapiPrivateV2_get_account()
+            res = await self.ccxt_exchanges['binance'].fetchPositions()
+            return res['positions']
+        else:
+            res = await self.ccxt_exchanges[ex_name].fetch_positions()
+            return res
+
+    async def fetch_positions(self, ex_name):
+        res = await self.ccxt_exchanges[ex_name].fetchPositions()
         return res
 
 
@@ -235,6 +245,7 @@ class CCXTRestApi:
         orders = None
         if ex_name == 'binance':
             orders = await self.ccxt_exchanges['binance'].fapiPrivateGetAllOrders()
+            print(orders)
         elif ex_name == 'okx':
             opens = await self.ccxt_exchanges['okx'].fetchOpenOrders()
             closed = await self.ccxt_exchanges['okx'].fetchClosedOrders()
@@ -321,30 +332,20 @@ class CCXTRestApi:
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'cancel_order', e)
         return res
 
-
-    async def fetch_order(self, ex_name, symbol, order_id):
-        '''
-        binance:
-        {'info': {'orderId': '9446494975', 'symbol': 'TRXUSDT', 'status': 'FILLED', 'clientOrderId': 'Y4QrMXGPVAkCTsllqGLXsV', 'price': '0', 'avgPrice': '0.06381', 'origQty': '100', 'executedQty': '100', 'cumQuote': '6.38100', 'timeInForce': 'GTC', 'type': 'MARKET', 'reduceOnly': False, 'closePosition': False, 'side': 'SELL', 'positionSide': 'BOTH', 'stopPrice': '0', 'workingType': 'CONTRACT_PRICE', 'priceProtect': False, 'origType': 'MARKET', 'time': '1681288077482', 'updateTime': '1681288077482'}, 'id': '9446494975', 'clientOrderId': 'Y4QrMXGPVAkCTsllqGLXsV', 'timestamp': 1681288077482, 'datetime': '2023-04-12T08:27:57.482Z', 'lastTradeTimestamp': None, 'symbol': 'TRX/USDT:USDT', 'type': 'market', 'timeInForce': 'GTC', 'postOnly': False, 'reduceOnly': False, 'side': 'sell', 'price': 0.06381, 'triggerPrice': None, 'amount': 100.0, 'cost': 6.381, 'average': 0.06381, 'filled': 100.0, 'remaining': 0.0, 'status': 'closed', 'fee': {'currency': None, 'cost': None, 'rate': None}, 'trades': [], 'fees': [{'currency': None, 'cost': None, 'rate': None}], 'stopPrice': None}
-        '''
-        res = await self.ccxt_exchanges[ex_name].fetch_order(order_id, symbol)
-        return res
-
-    async def fetch_trade(self, ex_name, symbol, order_id):
-        '''
-        okx:
-        {'info': {'accFillSz': '10', 'algoClOrdId': '', 'algoId': '', 'avgPx': '0.081858', 'cTime': '1681285189513', 'cancelSource': '', 'cancelSourceReason': '', 'category': 'normal', 'ccy': '', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'fee': '-0.40929', 'feeCcy': 'USDT', 'fillPx': '0.08185', 'fillSz': '2', 'fillTime': '1681285189514', 'instId': 'DOGE-USDT-SWAP', 'instType': 'SWAP', 'lever': '3', 'ordId': '566286360827858944', 'ordType': 'market', 'pnl': '0', 'posSide': 'net', 'px': '', 'quickMgnType': '', 'rebate': '0', 'rebateCcy': 'USDT', 'reduceOnly': 'false', 'side': 'sell', 'slOrdPx': '', 'slTriggerPx': '', 'slTriggerPxType': '', 'source': '', 'state': 'filled', 'sz': '10', 'tag': 'e847386590ce4dBC', 'tdMode': 'cross', 'tgtCcy': '', 'tpOrdPx': '', 'tpTriggerPx': '', 'tpTriggerPxType': '', 'tradeId': '224719298', 'uTime': '1681285189515'}, 'id': '566286360827858944', 'clientOrderId': 'e847386590ce4dBC6b998cb4b173f5e2', 'timestamp': 1681285189513, 'datetime': '2023-04-12T07:39:49.513Z', 'lastTradeTimestamp': 1681285189514, 'symbol': 'DOGE/USDT:USDT', 'type': 'market', 'timeInForce': 'IOC', 'postOnly': None, 'side': 'sell', 'price': 0.081858, 'stopLossPrice': None, 'takeProfitPrice': None, 'stopPrice': None, 'triggerPrice': None, 'average': 0.081858, 'cost': 818.58, 'amount': 10.0, 'filled': 10.0, 'remaining': 0.0, 'status': 'closed', 'fee': {'cost': 0.40929, 'currency': 'USDT'}, 'trades': [], 'reduceOnly': False, 'fees': [{'cost': 0.40929, 'currency': 'USDT'}]}
-        binance:
-        {'info': {'orderId': '9446494975', 'symbol': 'TRXUSDT', 'status': 'FILLED', 'clientOrderId': 'Y4QrMXGPVAkCTsllqGLXsV', 'price': '0', 'avgPrice': '0.06381', 'origQty': '100', 'executedQty': '100', 'cumQuote': '6.38100', 'timeInForce': 'GTC', 'type': 'MARKET', 'reduceOnly': False, 'closePosition': False, 'side': 'SELL', 'positionSide': 'BOTH', 'stopPrice': '0', 'workingType': 'CONTRACT_PRICE', 'priceProtect': False, 'origType': 'MARKET', 'time': '1681288077482', 'updateTime': '1681288077482'}, 'id': '9446494975', 'clientOrderId': 'Y4QrMXGPVAkCTsllqGLXsV', 'timestamp': 1681288077482, 'datetime': '2023-04-12T08:27:57.482Z', 'lastTradeTimestamp': None, 'symbol': 'TRX/USDT:USDT', 'type': 'market', 'timeInForce': 'GTC', 'postOnly': False, 'reduceOnly': False, 'side': 'sell', 'price': 0.06381, 'triggerPrice': None, 'amount': 100.0, 'cost': 6.381, 'average': 0.06381, 'filled': 100.0, 'remaining': 0.0, 'status': 'closed', 'fee': {'currency': None, 'cost': None, 'rate': None}, 'trades': [], 'fees': [{'currency': None, 'cost': None, 'rate': None}], 'stopPrice': None}
-        '''
-        order_status = await self.ccxt_exchanges[ex_name].fetch_order(order_id, symbol)
-        return order_status
     
     async def binance_get_trades(self):
         '''
         [{'symbol': 'TRXUSDT', 'id': '359484450', 'orderId': '9446494975', 'side': 'SELL', 'price': '0.06381', 'qty': '100', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '6.38100', 'commission': '0.00255239', 'commissionAsset': 'USDT', 'time': '1681288077482', 'positionSide': 'BOTH', 'maker': False, 'buyer': False}]
         '''
         res = await self.ccxt_exchanges['binance'].fapiPrivateGetUserTrades()
+        return res
+
+    async def get_trades(self, ex_name):
+        '''
+        okx:
+        {'code': '0', 'data': [{'side': 'buy', 'fillSz': '1', 'fillPx': '6.802', 'fee': '-0.003401', 'ordId': '566994268746092548', 'instType': 'SWAP', 'instId': 'DOT-USDT-SWAP', 'clOrdId': '', 'posSide': 'net', 'billId': '566994268754481166', 'tag': '', 'fillTime': '1681453967915', 'execType': 'T', 'tradeId': '151704912', 'feeCcy': 'USDT', 'ts': '1681453967915'}, {'side': 'sell', 'fillSz': '10', 'fillPx': '0.082', 'fee': '-0.00082', 'ordId': '566291942305632275', 'feeRate': '-0.001', 'instType': 'SPOT', 'instId': 'DOGE-USDT', 'clOrdId': '', 'posSide': 'net', 'billId': '566291942314020871', 'tag': '', 'fillTime': '1681286520242', 'execType': 'T', 'tradeId': '169912021', 'feeCcy': 'USDT', 'ts': '1681286520243'}, {'side': 'buy', 'fillSz': '10', 'fillPx': '0.0819', 'fee': '-0.4095', 'ordId': '566290831947534336', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': '', 'posSide': 'net', 'billId': '566290831955922955', 'tag': '', 'fillTime': '1681286255513', 'execType': 'T', 'tradeId': '224720485', 'feeCcy': 'USDT', 'ts': '1681286255513'}, {'side': 'buy', 'fillSz': '10', 'fillPx': '0.08185', 'fee': '-0.008', 'ordId': '566288611784986625', 'feeRate': '-0.0008', 'instType': 'SPOT', 'instId': 'DOGE-USDT', 'clOrdId': '', 'posSide': 'net', 'billId': '566288813291933697', 'tag': '', 'fillTime': '1681285774225', 'execType': 'M', 'tradeId': '169910296', 'feeCcy': 'DOGE', 'ts': '1681285774226'}, {'side': 'sell', 'fillSz': '2', 'fillPx': '0.08185', 'fee': '-0.08185', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247561', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719298', 'feeCcy': 'USDT', 'ts': '1681285189515'}, {'side': 'sell', 'fillSz': '4', 'fillPx': '0.08186', 'fee': '-0.16372', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247560', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719297', 'feeCcy': 'USDT', 'ts': '1681285189515'}, {'side': 'sell', 'fillSz': '1', 'fillPx': '0.08186', 'fee': '-0.04093', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247559', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719296', 'feeCcy': 'USDT', 'ts': '1681285189515'}, {'side': 'sell', 'fillSz': '1', 'fillPx': '0.08186', 'fee': '-0.04093', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247557', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719295', 'feeCcy': 'USDT', 'ts': '1681285189515'}, {'side': 'sell', 'fillSz': '1', 'fillPx': '0.08186', 'fee': '-0.04093', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247556', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719294', 'feeCcy': 'USDT', 'ts': '1681285189515'}, {'side': 'sell', 'fillSz': '1', 'fillPx': '0.08186', 'fee': '-0.04093', 'ordId': '566286360827858944', 'instType': 'SWAP', 'instId': 'DOGE-USDT-SWAP', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'posSide': 'net', 'billId': '566286360836247554', 'tag': 'e847386590ce4dBC', 'fillTime': '1681285189514', 'execType': 'T', 'tradeId': '224719293', 'feeCcy': 'USDT', 'ts': '1681285189515'}], 'msg': ''}
+        '''
+        res = await crp.ccxt_exchanges[ex_name].private_get_trade_fills()
         return res
 
 
@@ -364,11 +365,15 @@ if __name__ == '__main__':
     crp = CCXTRestApi()
     #order = asyncio.run(crp.send_order('binance', 'TRXUSDT', 'market', 'sell', 0, 100))
     #print(order)
-    #res = asyncio.run(crp.get_all_orders('okx'))
-    #print(res)
+    res = asyncio.run(crp.get_all_orders('bybit'))
+    df = pd.DataFrame(res)
+    #sele = df[df['side'].notnull()]
+    df.to_csv('./data.csv')
+    print(df)
     #time.sleep(3)
-    res = asyncio.run(crp.ccxt_exchanges['okx'].fetchClosedOrders())
-    print(res)
+    #res = asyncio.run(crp.ccxt_exchanges['binance'].fapiPrivateV2_get_account())
+    #df = pd.DataFrame(res['positions'])
+    #print(df)
     #pd.DataFrame(res['assets']).to_csv('./bina_asset.csv')
     #pd.DataFrame(res['positions']).to_csv('./bina_posi.csv')
     #df = pd.DataFrame(res['info']['result']['list'])

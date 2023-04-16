@@ -4,7 +4,9 @@ from TargetSymbolsData import TargetSymbolsData
 from TargetSymbolsDataInjector import TargetSymbolsDataInjector
 from Strategy import Strategy
 from AccountData import AccountData
+from AccountUpdater import AccountUpdater
 from Flags import Flags
+from CCXTRestApi import CCXTRestApi
 
 import pandas as pd
 import asyncio
@@ -15,7 +17,7 @@ class Main:
         Settings.initialize()
         TargetSymbolsData.initialize()
         tsdi = TargetSymbolsDataInjector(1000000.0)
-        Account.initialize()
+        
         #tsdi.inject_target_data()
         #tsdi.inject_ohlcv_data(14)
         tsdi.read_target_tickers()
@@ -28,7 +30,8 @@ class Main:
         strategy.calc_lot()
     
     async def main():
-        account = Account()
+        ccxt_api = CCXTRestApi()
+        account = AccountUpdater(ccxt_api)
         market_data = MarketData()
         strategy = Strategy()
         communication = Communication()

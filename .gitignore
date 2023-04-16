@@ -2,3 +2,4 @@
 *yaml
 /ignore/
 /Data/
+__pycache__/

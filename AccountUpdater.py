@@ -10,6 +10,14 @@ from Flags import Flags
 
 
 '''
+Botが行なった取引はRESTAPIで取得した情報そのままを正として使う。
+WSはrealtimeの約定確認に使えるがRESTAPIを正のデータとする。
+
+botがorder or holdしているsymbolは他のbotや人間が取引しないことを前提にしている。
+
+
+
+
 Filled, Closedになった場合はその時のavgPriceでpnl計算すればいい。
 Partialの場合は稀にしか発生しないと思うが、部分約定の度にavgPriceでpnl計算すると場合によっては値が間違ってしまう。
 （とりあえずpartialの時もavgPriceで簡易的に計算して、実際のpnlへの反映はfilled,closedの時のみ行うようにするか？）
@@ -33,6 +41,8 @@ pnlの計算:
 
 positionの更新確認:
 ・fetch_positionsで現在のposi, unrealized_pnlなど取得できる。
+・holdingがなくなったらデータも取れなくなるのでpnlなどはexit約定があるたびに計算して記録する必要がある。
+・約定済みのqtyをholdから減らしていき、0になった時点で全部exitとしてholdから消す。
 
 対応できない状況
 ・異なる価格で複数回に分けて利確した場合
@@ -90,7 +100,6 @@ class AccountUpdater:
         return con_df
         
 
-
     def __check_executions(self, latest_order_df):
         '''
         ・exec qtyの変化は約定、その後statusの変化でpartial, full, cancelを判定。
@@ -117,17 +126,17 @@ class AccountUpdater:
                             if matched_df['status'].iloc[0].lower() == 'open' or  matched_df['status'].iloc[0].lower() == 'new':#partial execution
                                 print(row['ex_name'], row['side'] ,' order for ', row['symbol'], ' has been partially executed.')
                                 AccountData.update_order(order_id=row['id'], executed_qty=matched_df['executed_qty'].iloc[0], status=matched_df['status'].iloc[0])
-                                self.__process_execution(matched_df, additional_exec_qty)
+                                #self.__process_execution(matched_df, additional_exec_qty)
                             elif matched_df['status'].iloc[0].lower() == 'filled' or  matched_df['status'].iloc[0].lower() == 'closed':#fully executed
                                 print(row['ex_name'], row['side'] ,' order for ', row['symbol'], ' has been fully executed.')
                                 self.__log_full_execution(matched_df)
                                 AccountData.remove_order(row['id'])
-                                self.__process_execution(matched_df, additional_exec_qty)
+                                #self.__process_execution(matched_df, additional_exec_qty)
                             elif matched_df['status'].iloc[0].lower() == 'canceled': #partial executed and canceled
                                 print(row['ex_name'], row['side'] ,' order for ', row['symbol'], ' has been partially executed and canceled.')
                                 self.__log_full_execution(matched_df)
                                 AccountData.remove_order(row['id'])
-                                self.__process_execution(matched_df, additional_exec_qty)
+                                #self.__process_execution(matched_df, additional_exec_qty)
                         else:
                             print('Executed qty(', matched_df['executed_qty'].iloc[0] ,') in ',  row['ex_name'], 'for ', row['symbol'] ,' is larger than original qty(', row['original_qty'], ')')
                     else:
@@ -161,14 +170,18 @@ class AccountUpdater:
                 0, 0, 0, 0, 0)
         else:
             if matched_holding_df['side'].iloc[0] == exec_side: #additional entry
+                avg_price = ((holding_df['qty'].iloc[0] * holding_df['price'].iloc[0]) + (exec_qty * exec_price)) / (holding_df['qty'].iloc[0] + exec_qty)
                 AccountData.update_holding(
                     symbol = exec_symbol,
-                    qty = float(matched_order_df['executed_qty'].iloc[0]))
+                    qty = holding_df['qty'].iloc[0] + exec_qty,
+                    price = avg_price,
+                )
             else:#exit entry
                 additional_realized_pnl = additional_exec_qty * (matched_order_df['price'] - matched_holding_df['price']) if matched_holding_df['side'] == 'long' else additional_exec_qty * (matched_holding_df['price'] - matched_order_df['price'])
                 AccountData.update_holding(
                     symbol = matched_order_df['symbol'].iloc[0],
                     qty=matched_holding_df['qty'].iloc[0] - additional_exec_qty,
+
                 )
 
     def __check_positions(self, curernt_position_df):

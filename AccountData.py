@@ -35,12 +35,15 @@ class AccountData:
         cls.order_fee = []
         cls.order_fee_currency = []
         cls.order_ts = []
+        #fee
+        cls.total_fees = {} #ex_name-symbol, total_fee (取引が発生する度にUSDTベースでのfeeを加算する)
+        cls.total_fee = 0
         #performance
         cls.num_trade = 0
         cls.num_win = 0
         cls.total_realized_pnl = 0
         cls.total_unrealized_pnl = 0
-        cls.total_fee = 0
+        cls.realized_pnls = {} #ex_name-symbol, realized_pnl (positionと反対方向の約定が発生する度にUSDTベースでのrealized pnlを保有銘柄毎に加算する、)
         #log
         cls.total_pnl_log = []
         cls.trades_df = [] #[{ex_name, symbol, entry_price, entry_qty, entry_timestamp, exit_price, exit_timestamp, realzied_pnl}]
@@ -213,6 +216,15 @@ class AccountData:
             except ValueError:
                 print(f"Holding for symbol {symbol} not found.")
 
+    @classmethod
+    def get_total_cash(cls):
+        with cls.lock:
+            return cls.total_cash
+        
+    @classmethod
+    def set_total_cash(cls, cash):
+        with cls.lock:
+            cls.total_cash = cash
 
     @classmethod
     def get_num_trade(cls):
@@ -255,6 +267,20 @@ class AccountData:
             cls.total_unrealized_pnl = value
 
     @classmethod
+    def get_total_fees(cls, ex_name, symbol):
+        with cls.lock:
+            key = ex_name+'-'+symbol
+            if key in cls.total_fees:
+                return cls.total_fees[ex_name+'-'+symbol]
+            else:
+                return None
+
+    @classmethod
+    def set_total_fees(cls, ex_name, symbol, fee):
+        with cls.lock:
+            cls.total_fees[ex_name+'-'+symbol] = fee
+
+    @classmethod
     def get_total_fee(cls):
         with cls.lock:
             return cls.total_fee
@@ -273,6 +299,20 @@ class AccountData:
     def set_total_pnl_log(cls, value):
         with cls.lock:
             cls.total_pnl_log = value
+    
+    @classmethod
+    def get_realized_pnls(cls, ex_name, symbol):
+        with cls.lock:
+            key = ex_name+'-'+symbol
+            if key in cls.realized_pnls:
+                return cls.realized_pnls[ex_name+'-'+symbol]
+            else:
+                return None
+    
+    @classmethod
+    def set_realized_pnls(cls, ex_name, symbol, pnl):
+        with cls.lock:
+            cls.realized_pnls[ex_name+'-'+symbol] = pnl
 
     @classmethod
     def get_trades_df(cls):

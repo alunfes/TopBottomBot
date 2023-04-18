@@ -1,5 +1,6 @@
 from TargetSymbolsData import TargetSymbolsData
 from CommunicationData import CommunicationData
+from CCXTRestApiParser import CCXTRestApiParser
 
 import ccxt.async_support as ccxt
 import time
@@ -199,12 +200,17 @@ class CCXTRestApi:
     
     async def fetch_account_balance(self, ex_name):
         '''
+        binance:
+        {'info': {'makerCommission': '10', 'takerCommission': '10', 'buyerCommission': '0', 'sellerCommission': '0', 'commissionRates': {'maker': '0.00100000', 'taker': '0.00100000', 'buyer': '0.00000000', 'seller': '0.00000000'}, 'canTrade': True, 'canWithdraw': True, 'canDeposit': True, 'brokered': False, 'requireSelfTradePrevention': False, 'updateTime': '1681258145176', 'accountType': 'SPOT', 'balances': [{'asset': 'BTC', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'LTC', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'ETH', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'NEO', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'BNB', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'QTUM', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'EOS', 'free': '0.00000000', 'locked': '0.00000000'}, {'asset': 'SNT', 'free': '0.00000000', 'locked': '0.00000000'},}
         bybit:
         {'info': {'retCode': '0', 'retMsg': 'OK', 'result': {'list': [{'coin': 'BTC', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '-0.47585393', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'ETH', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '191.09269265', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'EOS', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'XRP', 'equity': '0.01322603', 'walletBalance': '0.01322603', 'positionMargin': '0', 'availableBalance': '0.01322603', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '1242.16322603', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'USDT', 'equity': '995.91984767', 'walletBalance': '995.91972767', 'positionMargin': '0.22353768', 'availableBalance': '995.69618999', 'orderMargin': '0', 'occClosingFee': '0.11999988', 'occFundingFee': '0', 'unrealisedPnl': '0.00012', 'cumRealisedPnl': '16625.14302767', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'DOT', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'LTC', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'BIT', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'USDC', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '0', 'accountMM': '0'}, {'coin': 'ADA', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}, {'coin': 'MANA', 'equity': '0', 'walletBalance': '0', 'positionMargin': '0', 'availableBalance': '0', 'orderMargin': '0', 'occClosingFee': '0', 'occFundingFee': '0', 'unrealisedPnl': '0', 'cumRealisedPnl': '0', 'givenCash': '0', 'serviceCash': '0', 'accountIM': '', 'accountMM': ''}]}, 'retExtInfo': {}, 'time': '1681285933593'}, 'BTC': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'ETH': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'EOS': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'XRP': {'free': 0.01322603, 'used': 0.0, 'total': 0.01322603}, 'USDT': {'free': 995.69618999, 'used': 0.22353768, 'total': 995.91972767}, 'DOT': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'LTC': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'BIT': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'USDC': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'ADA': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'MANA': {'free': 0.0, 'used': 0.0, 'total': 0.0}, 'free': {'BTC': 0.0, 'ETH': 0.0, 'EOS': 0.0, 'XRP': 0.01322603, 'USDT': 995.69618999, 'DOT': 0.0, 'LTC': 0.0, 'BIT': 0.0, 'USDC': 0.0, 'ADA': 0.0, 'MANA': 0.0}, 'used': {'BTC': 0.0, 'ETH': 0.0, 'EOS': 0.0, 'XRP': 0.0, 'USDT': 0.22353768, 'DOT': 0.0, 'LTC': 0.0, 'BIT': 0.0, 'USDC': 0.0, 'ADA': 0.0, 'MANA': 0.0}, 'total': {'BTC': 0.0, 'ETH': 0.0, 'EOS': 0.0, 'XRP': 0.01322603, 'USDT': 995.91972767, 'DOT': 0.0, 'LTC': 0.0, 'BIT': 0.0, 'USDC': 0.0, 'ADA': 0.0, 'MANA': 0.0}}
         okx:
         {'info': {'code': '0', 'data': [{'adjEq': '996.3416641222', 'details': [{'availBal': '723.1372633333333', 'availEq': '723.1372633333334', 'cashBal': '995.22393', 'ccy': 'USDT', 'crossLiab': '0', 'disEq': '996.3416641222', 'eq': '995.80393', 'eqUsd': '996.3416641222', 'fixedBal': '0', 'frozenBal': '272.6666666666667', 'interest': '0', 'isoEq': '0', 'isoLiab': '0', 'isoUpl': '0', 'liab': '0', 'maxLoan': '7231.372633333332', 'mgnRatio': '', 'notionalLever': '', 'ordFrozen': '0', 'spotInUseAmt': '', 'stgyEq': '0', 'twap': '0', 'uTime': '1681285189515', 'upl': '0.5800000000000249', 'uplLiab': '0'}], 'imr': '272.8139066666667', 'isoEq': '0', 'mgnRatio': '115.93944929561067', 'mmr': '8.1844172', 'notionalUsd': '818.44172', 'ordFroz': '0', 'totalEq': '996.3416641222', 'uTime': '1681285648795'}], 'msg': ''}, 'USDT': {'free': 723.1372633333334, 'used': 272.6666666666666, 'total': 995.80393}, 'timestamp': 1681285648795, 'datetime': '2023-04-12T07:47:28.795Z', 'free': {'USDT': 723.1372633333334}, 'used': {'USDT': 272.6666666666666}, 'total': {'USDT': 995.80393}}
         '''
-        res = await self.ccxt_exchanges[ex_name].fetch_balance()
+        if ex_name == 'binance':
+            res = await self.ccxt_exchanges['binance'].fapiPrivateGetBalance()
+        else:
+            res = await self.ccxt_exchanges[ex_name].fetch_balance()
         return res
 
     
@@ -365,14 +371,14 @@ if __name__ == '__main__':
     crp = CCXTRestApi()
     #order = asyncio.run(crp.send_order('binance', 'TRXUSDT', 'market', 'sell', 0, 100))
     #print(order)
-    res = asyncio.run(crp.get_all_orders('bybit'))
-    df = pd.DataFrame(res)
+    res = asyncio.run(crp.fetch_account_balance('bybit'))
+    df =CCXTRestApiParser.parse_fetch_account_balance_bybit(res)
     #sele = df[df['side'].notnull()]
-    df.to_csv('./data.csv')
+    #df.to_csv('./data.csv')
     print(df)
     #time.sleep(3)
-    #res = asyncio.run(crp.ccxt_exchanges['binance'].fapiPrivateV2_get_account())
-    #df = pd.DataFrame(res['positions'])
+    #res = asyncio.run(crp.ccxt_exchanges['binance'].fapiPrivateGetBalance())
+    #df = pd.DataFrame(res)
     #print(df)
     #pd.DataFrame(res['assets']).to_csv('./bina_asset.csv')
     #pd.DataFrame(res['positions']).to_csv('./bina_posi.csv')

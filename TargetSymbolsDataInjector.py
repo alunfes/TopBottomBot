@@ -1,5 +1,5 @@
 from TargetSymbolsData import TargetSymbolsData
-from CCXTRestApiParser import CCXTRestApiWrapper
+from CCXTRestApi import CCXTRestApi
 from Settings import Settings
 
 import asyncio
@@ -10,9 +10,11 @@ import math
 
 
 class TargetSymbolsDataInjector:
-    def __init__(self, vol_kijun_24h:float):
+    def __init__(self, ccxt_api:CCXTRestApi, vol_kijun_24h:float):
+        TargetSymbolsData.initialize()
         self.loop = asyncio.new_event_loop()
         self.vol_kijun_24h = vol_kijun_24h
+        self.crp =ccxt_api
     
 
     def inject_ohlcv_data(self, data_days:int):
@@ -35,7 +37,7 @@ class TargetSymbolsDataInjector:
         all_download_done = 0
         while True:
             target = ex_symbol_pairs[i:i+num_cycle_downloads]
-            self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_multiple_ohlc(target, ohlc_min, since))
+            self.loop.run_until_complete(self.crp.get_multiple_ohlc(target, ohlc_min, since))
             all_download_done += 1
             if i + num_cycle_downloads > len(ex_symbol_pairs):
                 break
@@ -130,8 +132,8 @@ class TargetSymbolsDataInjector:
 
 
     def __get_binance_target(self):
-        tickers = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers('binance'))
-        ticker_vols = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers_24h_binance())
+        tickers = self.loop.run_until_complete(self.crp.get_tickers('binance'))
+        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_binance())
         #ticker_vols.to_csv('./binance_vol.csv')
         target = []
         sell_ok = []
@@ -163,8 +165,8 @@ class TargetSymbolsDataInjector:
 
 
     def __get_bybit_target(self):
-        tickers = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers('bybit'))
-        ticker_vols = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers_24h_bybit())
+        tickers = self.loop.run_until_complete(self.crp.get_tickers('bybit'))
+        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_bybit())
         #ticker_vols.to_csv('./bybit_vol.csv')
         target = []
         sell_ok = []
@@ -195,8 +197,8 @@ class TargetSymbolsDataInjector:
 
 
     def __get_okx_target(self):
-        tickers = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers('okx'))
-        ticker_vols = self.loop.run_until_complete(CCXTRestApiWrapper.crp.get_tickers_24h_okx())
+        tickers = self.loop.run_until_complete(self.crp.get_tickers('okx'))
+        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_okx())
         #ticker_vols.to_csv('./okx_vol.csv')
         target = []
         sell_ok = []
@@ -228,15 +230,15 @@ class TargetSymbolsDataInjector:
 
     
 
-
 if __name__ == '__main__':
     Settings.initialize()
+    crp = CCXTRestApi()
     TargetSymbolsData.initialize()
-    tsdi = TargetSymbolsDataInjector(1000000.0)
-    #tsdi.inject_target_data()
-    #tsdi.inject_ohlcv_data(14)
-    tsdi.read_target_tickers()
-    tsdi.read_all_ohlcv()
+    tsdi = TargetSymbolsDataInjector(crp, 1000000.0)
+    tsdi.inject_target_data()
+    tsdi.inject_ohlcv_data(14)
+    #tsdi.read_target_tickers()
+    #tsdi.read_all_ohlcv()
 
 
 

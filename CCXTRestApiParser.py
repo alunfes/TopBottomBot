@@ -66,11 +66,11 @@ class CCXTRestApiParser:
         for item in closed_orders:
             id = item['id']
             symbol = item['symbol']
-            status = item['status']
+            status = item['status'].lower()
             price = float(item['price'])
             avg_price = float(item['avgPx']) if item['avgPx'] != ''  else 0.0
-            side = item['side']
-            otype = item['type']
+            side = item['side'].lower()
+            otype = item['type'].lower()
             original_qty = float(item['amount'])
             executed_qty = float(item['filled'])
             timestamp = item['timestamp']
@@ -224,4 +224,46 @@ class CCXTRestApiParser:
         return df
 
 
+    @classmethod
+    def parse_fetch_account_balance_binance(cls, binance_balance):
+        '''
+        fapiPrivateGetBalance
+                accountAlias asset      balance withdrawAvailable     updateTime
+        8   sRFzSgXqfWsRAu  USDT   100.005708       99.46825798  1681288077482
+        10  sRFzSgXqfWsRAu  USDC  1000.000000     1000.00000000  1681256494484
+        '''
+        df = pd.DataFrame(binance_balance)
+        df['balance'] = df['balance'].astype(float)
+        df = df[df['balance']>0]
+        df['ex_name'] = ['binance'] * len(df)
+        return df[['ex_name', 'asset','balance']]
 
+
+    @classmethod
+    def parse_fetch_account_balance_okx(cls, okx_balance):
+        '''
+        {'info': {'code': '0', 'data': [{'adjEq': '994.8411120620503', 'details': [{'availBal': '994.3836955620919', 'availEq': '994.3836955620919', 'cashBal': '994.3836955620919', 'ccy': 'USDT', 'crossLiab': '0', 'disEq': '994.8411120620503', 'eq': '994.3836955620919', 'eqUsd': '994.8411120620503', 'fixedBal': '0', 'frozenBal': '0', 'interest': '0', 'isoEq': '0', 'isoLiab': '0', 'isoUpl': '0', 'liab': '0', 'maxLoan': '9943.836955620918', 'mgnRatio': '', 'notionalLever': '', 'ordFrozen': '0', 'spotInUseAmt': '', 'stgyEq': '0', 'twap': '0', 'uTime': '1681563116783', 'upl': '0', 'uplLiab': '0'}], 'imr': '0', 'isoEq': '0', 'mgnRatio': '', 'mmr': '0', 'notionalUsd': '0', 'ordFroz': '0', 'totalEq': '994.8411120620503', 'uTime': '1681795224218'}], 'msg': ''}, 'USDT': {'free': 994.3836955620919, 'used': 0.0, 'total': 994.3836955620919}, 'timestamp': 1681795224218, 'datetime': '2023-04-18T05:20:24.218Z', 'free': {'USDT': 994.3836955620919}, 'used': {'USDT': 0.0}, 'total': {'USDT': 994.3836955620919}}
+        '''
+        df = pd.DataFrame({'currency': ['USDT'], 'amount': [okx_balance['USDT']['free']]})
+        df = df.rename(columns={'currency': 'asset', 'amount':'balance'})
+        df['balance'] = df['balance'].astype(float)
+        df['ex_name'] = ['okx'] * len(df)
+        df = df[df['balance']>0]
+        return df
+    
+
+    @classmethod
+    def parse_fetch_account_balance_bybit(cls, bybit_balance):
+        '''
+            asset     balance ex_name
+        3   XRP    0.013226   bybit
+        4  USDT  995.959343   bybit
+        '''
+        data = {'asset': [], 'balance': []}
+        for item in bybit_balance['info']['result']['list']:
+            data['asset'].append(item['coin'])
+            data['balance'].append(float(item['equity']))
+        df = pd.DataFrame(data)
+        df = df[df['balance'] > 0]
+        df['ex_name'] = ['bybit'] * len(df)
+        return df

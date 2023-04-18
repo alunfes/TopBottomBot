@@ -16,6 +16,7 @@ class Settings:
                 cls.after_kijun_period = int(data['after_kijun_period'])
                 cls.num_top_bottom_targets = int(data['num_top_bottom_targets'])
                 cls.account_update_freq = int(data['account_update_freq'])
+                cls.target_24h_vol_kijun = float(data['target_24h_vol_kijun'])
         except Exception as e:
             print('Settings.__read_setting.yaml: ', e)
             return None

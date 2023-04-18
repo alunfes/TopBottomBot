@@ -5,6 +5,7 @@ from TargetSymbolsDataInjector import TargetSymbolsDataInjector
 from Strategy import Strategy
 from AccountData import AccountData
 from AccountUpdater import AccountUpdater
+from Bot import Bot
 from Flags import Flags
 from CCXTRestApi import CCXTRestApi
 
@@ -35,12 +36,14 @@ class Main:
         market_data = MarketData()
         strategy = Strategy()
         communication = Communication()
+        bot = Bot()
 
         await asyncio.gather(
             account.start_update(),
             market_data.start_update(),
             strategy.start(),
             communication.start(),
+            bot.start_bot()
         )
         
 

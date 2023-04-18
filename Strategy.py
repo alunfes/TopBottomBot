@@ -1,7 +1,7 @@
 from TargetSymbolsData import TargetSymbolsData
 from Settings import Settings
-from AccountData import Account
-from CCXTRestApiParser import CCXTRestApiWrapper
+from AccountData import AccountData
+from CCXTRestApi import CCXTRestApi
 
 import pandas as pd 
 import asyncio
@@ -10,15 +10,27 @@ import asyncio
 *単純にindexhじゃなくて一致するdt（もしくはそれより後のdtでもok）で計算するようにしないといけない。
 ・対象全銘柄の最終日時があっていることを確認する。
 ・任意の直近期間の変化率を計算して、top/bottomを算出。それぞれに対しての売買金額・lotを計算。
+
+基本戦略：
+・topを売ってbottomを買う。2週間後に決済。
+・個別銘柄一定以上の収益になったら利確・損切り
+・その他、銘柄毎に4時間足でトレンド継続している間はエントリーしないなど。
+
+引数：
+・
+
+返り値：
+・portfolioと取るべきアクション
+
 '''
 class Strategy:
-    def __init__(self):
+    def __init__(self, ccxt_api:CCXTRestApi):
         self.price_change_ratio = {}
         self.top_targets = {}
         self.bottom_targets = {}
         self.top_targets_df = pd.DataFrame()
         self.bottom_targets_df = pd.DataFrame()
-        self.loop = asyncio.new_event_loop()
+        self.crp = ccxt_api
         
 
     def calc_change_ratio(self):
@@ -36,7 +48,7 @@ class Strategy:
         self.bottom_targets_df = pd.DataFrame({'keys':[x[0] for x in self.bottom_targets], 'ex_name':[x[0].split('-')[0] for x in self.bottom_targets], 'change_ratio':[x[1] for x in self.bottom_targets]})
     
 
-    def calc_lot(self):
+    async def calc_lot(self):
         num_targets_ex = {}
         for ex in Settings.exchanges:
             num_targets_ex[ex] = 0
@@ -49,14 +61,14 @@ class Strategy:
         print('num targets exchanges:')
         print(num_targets_ex)
         self.top_targets_df['allocation_percent'] = [round(1.0 / (len(self.top_targets_df) + len(self.bottom_targets_df)), 6)] * len(self.top_targets_df)
-        self.top_targets_df['allocation_amount'] = [round(0.5 * Account.total_cash / (len(self.top_targets_df) + len(self.bottom_targets_df)), 2)] * len(self.top_targets_df)
+        self.top_targets_df['allocation_amount'] = [round(0.5 * AccountData.get_total_cash() / (len(self.top_targets_df) + len(self.bottom_targets_df)), 2)] * len(self.top_targets_df)
         self.bottom_targets_df['allocation_percent'] = [round(1.0 / (len(self.top_targets_df) + len(self.bottom_targets_df)), 6)] * len(self.bottom_targets_df)
-        self.bottom_targets_df['allocation_amount'] = [round(0.5 * Account.total_cash / (len(self.top_targets_df) + len(self.bottom_targets_df)), 2)] * len(self.bottom_targets_df)
+        self.bottom_targets_df['allocation_amount'] = [round(0.5 * AccountData.get_total_cash() / (len(self.top_targets_df) + len(self.bottom_targets_df)), 2)] * len(self.bottom_targets_df)
         top_lots = []
         top_prices = []
         for i in range(len(self.top_targets_df)):
             symbol = self.top_targets_df.iloc[i]['keys'].split('-')[1] if self.top_targets_df.iloc[i]['ex_name'] != 'okx' else self.top_targets_df.iloc[i]['keys'].split('-')[1].replace('USDT','') + '-USDT-SWAP'
-            res =  self.loop.run_until_complete(CCXTRestApiWrapper.crp.fetch_target_price(self.top_targets_df.iloc[i]['ex_name'], symbol))
+            res =  await self.crp.fetch_target_price(self.top_targets_df.iloc[i]['ex_name'], symbol)
             top_prices.append(float(res['last'].iloc[0]))
             top_lots.append(self.top_targets_df['allocation_amount'].iloc[i] / float(res['last'].iloc[0]))
         self.top_targets_df['allocation_lot'] = top_lots
@@ -65,13 +77,13 @@ class Strategy:
         bottom_prices = []
         for i in range(len(self.bottom_targets_df)):
             symbol = self.bottom_targets_df.iloc[i]['keys'].split('-')[1] if self.bottom_targets_df.iloc[i]['ex_name'] != 'okx' else self.bottom_targets_df.iloc[i]['keys'].split('-')[1].replace('USDT','') + '-USDT-SWAP'
-            res =  self.loop.run_until_complete(CCXTRestApiWrapper.crp.fetch_target_price(self.bottom_targets_df.iloc[i]['ex_name'], symbol))
+            res =  await self.crp.fetch_target_price(self.bottom_targets_df.iloc[i]['ex_name'], symbol)
             bottom_prices.append(float(res['last'].iloc[0]))
             bottom_lots.append(self.bottom_targets_df['allocation_amount'].iloc[i] / float(res['last'].iloc[0]))
         self.bottom_targets_df['allocation_lot'] = bottom_lots
         self.bottom_targets_df['allocation_price'] = bottom_prices
-        self.top_targets_df.to_csv('./top_targets_df.csv', index=False)
-        self.bottom_targets_df.to_csv('./bottom_targets_df.csv', index=False)
+        self.top_targets_df.to_csv('./Data/top_targets_df.csv', index=False)
+        self.bottom_targets_df.to_csv('./Data/bottom_targets_df.csv', index=False)
 
         
             

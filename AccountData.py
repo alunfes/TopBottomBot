@@ -92,14 +92,14 @@ class AccountData:
             cls.order_ex_name.append(ex_name)
             cls.order_id.append(id)
             cls.order_symbol.append(symbol)
-            cls.order_side.append(side)
-            cls.order_type.append(type)
-            cls.order_price.append(price)
-            cls.order_avg_price.append(avg_price)
-            cls.order_status.append(status)
-            cls.order_original_qty.append(original_qty)
-            cls.order_executed_qty.append(executed_qty)
-            cls.order_fee.append(fee)
+            cls.order_side.append(side.lower())
+            cls.order_type.append(type.lower())
+            cls.order_price.append(float(price))
+            cls.order_avg_price.append(float(avg_price))
+            cls.order_status.append(status.lower())
+            cls.order_original_qty.append(float(original_qty))
+            cls.order_executed_qty.append(float(executed_qty))
+            cls.order_fee.append(float(fee))
             cls.order_fee_currency.append(fee_currency)
             cls.order_ts.append(timestamp)
     
@@ -168,21 +168,21 @@ class AccountData:
                 if symbol is not None:
                     cls.order_symbol[idx] = symbol
                 if side is not None:
-                    cls.order_side[idx] = side
+                    cls.order_side[idx] = side.lower()
                 if type is not None:
-                    cls.order_type[idx] = type
+                    cls.order_type[idx] = type.lower()
                 if price is not None:
-                    cls.order_price[idx] = price
+                    cls.order_price[idx] = float(price)
                 if avg_price is not None:
-                    cls.order_avg_price[idx] = avg_price
+                    cls.order_avg_price[idx] = float(avg_price)
                 if status is not None:
-                    cls.order_status[idx] = status
+                    cls.order_status[idx] = status.lower()
                 if original_qty is not None:
-                    cls.order_original_qty[idx] = original_qty
+                    cls.order_original_qty[idx] = float(original_qty)
                 if executed_qty is not None:
-                    cls.order_executed_qty[idx] = executed_qty
+                    cls.order_executed_qty[idx] = float(executed_qty)
                 if fee is not None:
-                    cls.order_fee[idx] = fee
+                    cls.order_fee[idx] = float(fee)
                 if fee_currency is not None:
                     cls.order_fee_currency[idx] = fee_currency
             except ValueError:

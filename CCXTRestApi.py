@@ -254,7 +254,6 @@ class CCXTRestApi:
         orders = None
         if ex_name == 'binance':
             orders = await self.ccxt_exchanges['binance'].fapiPrivateGetAllOrders()
-            print(orders)
         elif ex_name == 'okx':
             opens = await self.ccxt_exchanges['okx'].fetchOpenOrders()
             closed = await self.ccxt_exchanges['okx'].fetchClosedOrders()
@@ -389,10 +388,15 @@ class CCXTRestApi:
 
 
 if __name__ == '__main__':
-    #9446494975
+    loop = asyncio.get_event_loop()
+
     crp = CCXTRestApi()
-    order = asyncio.run(crp.send_order('okx', 'CSPR-USDT-SWAP', 'limit', 'sell', 0.06, 100))
+    order = loop.run_until_complete(crp.send_order('bybit', 'COREUSDT', 'limit', 'buy', 1.5, 10))
     print(order)
+    time.sleep(3)
+    orders = loop.run_until_complete(crp.get_all_orders('bybit'))
+    df= CCXTRestApiParser.parse_get_all_orders_general('bybit',orders)
+    print(df)
     #res = asyncio.run(crp.fetch_account_balance('bybit'))
     #df =CCXTRestApiParser.parse_fetch_account_balance_bybit(res)
     #sele = df[df['side'].notnull()]

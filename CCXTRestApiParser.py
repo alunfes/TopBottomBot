@@ -87,7 +87,7 @@ class CCXTRestApiParser:
             symbol = item['symbol']
             status = item['status']
             price = float(item['price'])
-            avg_price = float(item['avgPx']) if item['avgPx'] != ''  else 0.0
+            avg_price = float(item['average']) if item['average'] != None  else 0.0
             side = item['side']
             otype = item['type']
             original_qty = float(item['amount'])
@@ -119,19 +119,22 @@ class CCXTRestApiParser:
         if len(order_df) > 0 and len(binace_trades) > 0:
             order_cols = ['orderId', 'symbol', 'status', 'price', 'avgPrice', 'side', 'type', 'origQty', 'executedQty', 'time']
             order_df = pd.DataFrame(order_df, columns=order_cols)
-            order_df = order_df['price'].astype(float)
-            order_df = order_df['avgPrice'].astype(float)
-            order_df = order_df['origQty'].astype(float)
-            order_df = order_df['executedQty'].astype(float)
-            order_df = order_df['side'].str.lower()
-            order_df = order_df['status'].str.lower()
+            order_df['price'] = order_df['price'].astype(float)
+            order_df['avgPrice'] = order_df['avgPrice'].astype(float)
+            order_df['origQty'] = order_df['origQty'].astype(float)
+            order_df['executedQty'] = order_df['executedQty'].astype(float)
+            order_df['side'] = order_df['side'].str.lower()
+            order_df['status'] = order_df['status'].str.lower()
             fees = []
             fee_currency = []
             for i in range(len(order_df)):
                 if order_df['orderId'].iloc[i] in list(trade_df['orderId']):
-                    commision = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commission'].item()
-                    currency = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commissionAsset'].item()
-                    fees.append(float(commision))
+                    commision_rows = trade_df[trade_df['orderId'] == order_df['orderId'].iloc[i]]
+                    commision_sum = 0
+                    currency = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commissionAsset'].values[0]
+                    for _, row in commision_rows.iterrows():
+                        commision_sum += float(row['commission'])
+                    fees.append(commision_sum)
                     fee_currency.append(currency)
                 else:
                     fees.append(0.0)

@@ -275,7 +275,6 @@ class AccountUpdater:
                 )
 
         def __check_okx_order_cancel(matched_api_order_df, account_order):
-            print('Order canclled: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
             if account_order['ex_name'] == 'okx':
                 matched_df = matched_api_order_df[matched_api_order_df['id'] == account_order['id']]
                 if len(matched_df) == 0:
@@ -287,7 +286,7 @@ class AccountUpdater:
 
         orders = AccountData.get_order_df()
         for index, account_order in orders.iterrows():
-            matched_api_order_df = api_orders_df[api_orders_df['id']==orders['id']] #約定確認したいorder_idに一致するAPIで取得したorder data
+            matched_api_order_df = api_orders_df[api_orders_df['id']==account_order['id']] #約定確認したいorder_idに一致するAPIで取得したorder data
             if __check_okx_order_cancel(matched_api_order_df, account_order):
                 if __check_order_matching(matched_api_order_df, account_order):
                     if account_order['type'] == 'limit':
@@ -295,7 +294,9 @@ class AccountUpdater:
                             matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[0]
                             additional_exec_qty = matched_api_order_dict['executed_qty'] -  account_order['executed_qty']
                             holding_data_df = AccountData.get_holding_df()
-                            matched_holding_data_df = holding_data_df[holding_data_df['ex_name']==matched_api_order_dict['ex_name'] and holding_data_df['symbol']==matched_api_order_dict['symbol']]
+                            matched_holding_data_df = pd.DataFrame()
+                            if len(holding_data_df) > 0:
+                                matched_holding_data_df = holding_data_df[(holding_data_df['ex_name']==matched_api_order_dict['ex_name']) & (holding_data_df['symbol']==matched_api_order_dict['symbol'])]
                             new_fee = __calc_fee(matched_api_order_dict['ex_name'], matched_api_order_dict['symbol'], matched_api_order_dict['fee'], matched_api_order_dict['fee_currency'], matched_api_order_df['price'])
                             AccountData.set_total_fees(matched_api_order_dict['ex_name'], matched_api_order_dict['symbol'], new_fee)
                             if len(matched_holding_data_df) == 0: #new execution
@@ -329,7 +330,9 @@ class AccountUpdater:
                                 matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[0]
                                 additional_exec_qty = matched_api_order_dict['executed_qty'] -  account_order['executed_qty']
                                 holding_data_df = AccountData.get_holding_df()
-                                matched_holding_data_df = holding_data_df[holding_data_df['ex_name']==matched_api_order_dict['ex_name'] and holding_data_df['symbol']==matched_api_order_dict['symbol']]
+                                matched_holding_data_df = pd.DataFrame()
+                                if len(holding_data_df) > 0:
+                                    matched_holding_data_df = holding_data_df[(holding_data_df['ex_name']==matched_api_order_dict['ex_name']) & (holding_data_df['symbol']==matched_api_order_dict['symbol'])]
                                 new_fee = __calc_fee(matched_api_order_dict['ex_name'], matched_api_order_dict['symbol'], matched_api_order_dict['fee'], matched_api_order_dict['fee_currency'], matched_api_order_df['price'])
                                 AccountData.set_total_fees(matched_api_order_dict['ex_name'], matched_api_order_dict['symbol'], new_fee)
                                 if len(matched_holding_data_df) == 0: #new execution
@@ -397,7 +400,7 @@ class AccountUpdater:
     def __sync_holding_data(self, curernt_position_df):
         holding_df = AccountData.get_holding_df()
         for index, holding in holding_df.iterrows():
-            matched_current_position_df = curernt_position_df[curernt_position_df['ex_name'].iloc[0] == holding['ex_name'] and curernt_position_df['symbol'].iloc[0] == holding['symbol']]
+            matched_current_position_df = curernt_position_df[(curernt_position_df['ex_name'].iloc[0] == holding['ex_name']) & (curernt_position_df['symbol'].iloc[0] == holding['symbol'])]
             if len(matched_current_position_df) == 1:
                 matched_current_position_dict = matched_current_position_df.to_dict(orient='records')[0]
                 AccountData.update_holding(
@@ -443,7 +446,7 @@ class AccountUpdater:
                     fee_currency=matched_current_order_dict['fee_currency'],
                 )
             else:
-                print('matched order data size is not 1 !')
+                print('matched order data size is ', len(matched_current_order_df), ' not 1 !')
                 print('matched_current_order_df')
                 print(matched_current_order_df)
                 print('AccountData.order_df')

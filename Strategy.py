@@ -31,7 +31,7 @@ class Strategy:
         self.top_targets_df = pd.DataFrame()
         self.bottom_targets_df = pd.DataFrame()
         self.crp = ccxt_api
-        
+    
 
     def calc_change_ratio(self):
         target_ohlcv_df = TargetSymbolsData.target_ohlcv_df.copy()
@@ -86,7 +86,7 @@ class Strategy:
         self.bottom_targets_df.to_csv('./Data/bottom_targets_df.csv', index=False)
 
         
-            
+    
 
 
 

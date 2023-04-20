@@ -106,11 +106,14 @@ class TestMain:
         tsdi.read_target_tickers()
         tsdi.read_all_ohlcv()
     
+    '''
+    botでorder出す時は、ex_name, base assetが一致するtarget_dfのデータのsymbolを使うべき
+    '''
     def __generate_test_action_data(self):
         ad = ActionData()
         ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', order_type='limit', price=0, qty=5)
         ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', order_type='limit', price=0, qty=200)
-        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR/USDT:USDT', order_type='limit', price=0, qty=90)
+        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', order_type='limit', price=0, qty=90)
         ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', order_type='limit', price=0, qty=2)
         return ad.get_action()
 
@@ -171,7 +174,7 @@ class TestMain:
             print(holding)
             print('Order:')
             print(order)
-            asyncio.sleep(60)
+            await asyncio.sleep(60)
         actions = self.__generate_test_exit_action_data()
         for i in range(10): #do exit
             if action['action'] == 'buy' or action['action'] == 'sell':
@@ -221,8 +224,6 @@ class TestMain:
 
 
 
-
-
     async def main(self):
         ccxt_api = CCXTRestApi()
         account = AccountUpdater(ccxt_api)
@@ -249,20 +250,25 @@ class TestStrategy:
         crp = CCXTRestApi()
         TargetSymbolsData.initialize()
         tsdi = TargetSymbolsDataInjector(crp, 1000000.0)
-        tsdi.inject_target_data()
+        #tsdi.inject_target_data()
+        #tsdi.inject_ohlcv_data(14)
+        tsdi.read_target_tickers()
+        tsdi.read_all_ohlcv()
         strategy = Strategy(crp)
         strategy.calc_change_ratio()
         strategy.detect_top_bottom_targets()
+        strategy.calc_lot()
         
     
 
 if __name__ == '__main__':
-   #tc = TestComm()
-   #asyncio.run(tc.main())
-   tm = TestMain()
-   asyncio.run(tm.main())
-   #test = Test()
-   #po = asyncio.run(test.crp.fetch_positions('okx'))
-   #df = CCXTRestApiParser.parse_fetch_holding_position_okx(po)
-   #print(df)
+    #ts = TestStrategy()
+    #tc = TestComm()
+    #asyncio.run(tc.main())
+    tm = TestMain()
+    asyncio.run(tm.main())
+    #test = Test()
+    #po = asyncio.run(test.crp.fetch_positions('okx'))
+    #df = CCXTRestApiParser.parse_fetch_holding_position_okx(po)
+    #print(df)
     

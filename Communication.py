@@ -19,7 +19,9 @@ class Communication:
         self.application.add_handler(CommandHandler("status", self.get_status))
         self.chat_id = None
         self.__get_comm_data_thread()
-        self.application.run_polling()
+        #self.application.run_polling()
+
+
 
     def fire_and_forget(func):
         def wrapper(*args, **kwargs):
@@ -34,6 +36,7 @@ class Communication:
         with open('./ignore/api.yaml', 'r') as f:
             api_keys = yaml.load(f, Loader=yaml.FullLoader)
             self.api_key = api_keys['telegram']['public_key']
+
 
     @fire_and_forget
     async def __get_comm_data_thread(self):
@@ -57,14 +60,17 @@ class Communication:
     async def send_message(self, chat_id, message: str) -> None:
         await self.application.bot.send_message(chat_id=chat_id, text=message)
 
-
+    async def main_loop(self):
+        while True:
+            await asyncio.sleep(5)
     
 
-    
 
 
 
 if __name__ == '__main__':
     communication = Communication()
+    asyncio.gather(communication.main_loop())
+
 
     

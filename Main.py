@@ -16,13 +16,8 @@ class Main:
     def __init__(self):
         Flags.initialize()
         Settings.initialize()
-        TargetSymbolsData.initialize()
-        tsdi = TargetSymbolsDataInjector(1000000.0)
-        
         #tsdi.inject_target_data()
         #tsdi.inject_ohlcv_data(14)
-        tsdi.read_target_tickers()
-        tsdi.read_all_ohlcv()
         strategy = Strategy()
         strategy.calc_change_ratio()
         strategy.detect_top_bottom_targets()
@@ -50,3 +45,4 @@ class Main:
 
 if __name__ == '__main__':
     m =  Main()
+    asyncio.run(m.main())

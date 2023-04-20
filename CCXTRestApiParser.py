@@ -42,7 +42,7 @@ class CCXTRestApiParser:
         # リストから必要な情報を取り出して辞書型のリストを作成する
         orders = []
         for d in all_orders:
-            order = {'id': d['id'], 'symbol': d['symbol'], 'status': d['status'], 'price': float(d['price']),'avg_price': float(d['average']), 'type':d['type'],
+            order = {'id': d['id'], 'symbol': d['symbol'], 'status': d['status'], 'price': float(d['price']),'avg_price': float(d['average']) if d['average']!=None else float(d['price']), 'type':d['type'],
                     'side': d['side'], 'original_qty': float(d['amount']), 'executed_qty': float(d['filled']),
                     'timestamp': pd.to_datetime(d['timestamp'], unit='ms'), 'fee': float(d['fee']['cost']), 'fee_currency': d['fee']['currency']}
             orders.append(order)
@@ -116,30 +116,33 @@ class CCXTRestApiParser:
         '''
         order_df = pd.DataFrame(all_orders)
         trade_df = pd.DataFrame(binace_trades)
-        order_cols = ['orderId', 'symbol', 'status', 'price', 'avgPrice', 'side', 'type', 'origQty', 'executedQty', 'time']
-        order_df = pd.DataFrame(order_df, columns=order_cols)
-        order_df = order_df['price'].astype(float)
-        order_df = order_df['avgPrice'].astype(float)
-        order_df = order_df['origQty'].astype(float)
-        order_df = order_df['executedQty'].astype(float)
-        order_df = order_df['side'].str.lower()
-        order_df = order_df['status'].str.lower()
-        fees = []
-        fee_currency = []
-        for i in range(len(order_df)):
-            if order_df['orderId'].iloc[i] in list(trade_df['orderId']):
-                commision = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commission'].item()
-                currency = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commissionAsset'].item()
-                fees.append(float(commision))
-                fee_currency.append(currency)
-            else:
-                fees.append(0.0)
-                fee_currency.append('')
-        order_df['fee'] = fees
-        order_df['fee_currency'] = fee_currency
-        order_df['ex_name'] = ['binance'] * len(order_df)
-        order_df.rename(columns={'orderId': 'id', 'avgPrice': 'avg_price', 'origQty': 'original_qty', 'executedQty': 'executed_qty', 'time': 'ts'}, inplace=True)
-        return order_df
+        if len(order_df) > 0 and len(binace_trades) > 0:
+            order_cols = ['orderId', 'symbol', 'status', 'price', 'avgPrice', 'side', 'type', 'origQty', 'executedQty', 'time']
+            order_df = pd.DataFrame(order_df, columns=order_cols)
+            order_df = order_df['price'].astype(float)
+            order_df = order_df['avgPrice'].astype(float)
+            order_df = order_df['origQty'].astype(float)
+            order_df = order_df['executedQty'].astype(float)
+            order_df = order_df['side'].str.lower()
+            order_df = order_df['status'].str.lower()
+            fees = []
+            fee_currency = []
+            for i in range(len(order_df)):
+                if order_df['orderId'].iloc[i] in list(trade_df['orderId']):
+                    commision = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commission'].item()
+                    currency = trade_df.loc[trade_df['orderId'] == order_df['orderId'].iloc[i], 'commissionAsset'].item()
+                    fees.append(float(commision))
+                    fee_currency.append(currency)
+                else:
+                    fees.append(0.0)
+                    fee_currency.append('')
+            order_df['fee'] = fees
+            order_df['fee_currency'] = fee_currency
+            order_df['ex_name'] = ['binance'] * len(order_df)
+            order_df.rename(columns={'orderId': 'id', 'avgPrice': 'avg_price', 'origQty': 'original_qty', 'executedQty': 'executed_qty', 'time': 'ts'}, inplace=True)
+            return order_df
+        else:
+            return None
 
 
     
@@ -160,9 +163,9 @@ class CCXTRestApiParser:
             qty = float(d['contracts'])
             timestamp = d['timestamp']
             unrealized_pnl = float(d['unrealizedPnl'])
-            unrealized_pnl_ratio = float(d['percentage'])
-            liquidation_price = float(d['liquidationPrice'])
-            margin_ratio = float(d['marginRatio'])
+            unrealized_pnl_ratio = float(d['percentage']) if d['percentage'] != None else 0
+            liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice'] != None else 0
+            margin_ratio = float(d['marginRatio']) if d['marginRatio'] != None else 0
             # 各行の値をタプルとしてリストに追加
             records.append((symbol, side, price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio))
         # リストからデータフレームを作成
@@ -251,19 +254,20 @@ class CCXTRestApiParser:
         df = df[df['balance']>0]
         return df
     
-
     @classmethod
     def parse_fetch_account_balance_bybit(cls, bybit_balance):
-        '''
-            asset     balance ex_name
-        3   XRP    0.013226   bybit
-        4  USDT  995.959343   bybit
-        '''
-        data = {'asset': [], 'balance': []}
-        for item in bybit_balance['info']['result']['list']:
-            data['asset'].append(item['coin'])
-            data['balance'].append(float(item['equity']))
-        df = pd.DataFrame(data)
-        df = df[df['balance'] > 0]
+        coin_data = bybit_balance['info']['result']['list']
+        # assetとbalanceカラムを持つ空のDataFrameを作成
+        df = pd.DataFrame(columns=['asset', 'balance'])
+        # データを処理してDataFrameに追加
+        for entry in coin_data:
+            asset = entry['coin']
+            balance = float(entry['walletBalance'])
+            # balanceが0以上の場合に限り、DataFrameに追加
+            if balance > 0:
+                new_row = pd.DataFrame({'asset': [asset], 'balance': [balance]})
+                df = pd.concat([df, new_row], ignore_index=True)
         df['ex_name'] = ['bybit'] * len(df)
         return df
+
+

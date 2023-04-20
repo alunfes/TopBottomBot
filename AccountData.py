@@ -56,7 +56,7 @@ class AccountData:
             return pd.DataFrame({
                 'ex_name':cls.holding_ex_name, 
                 'symbol':cls.holding_symbol, 
-                'side':cls.hodling_side, 
+                'side':cls.holding_side, 
                 'price':cls.holding_price, 
                 'qty':cls.holding_qty, 
                 'timestamp':cls.holding_timestamp, 

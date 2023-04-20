@@ -2,9 +2,20 @@ from CCXTRestApiParser import CCXTRestApiParser
 from CCXTRestApi import CCXTRestApi
 from Settings import Settings
 from AccountData import AccountData
+from AccountUpdater import AccountUpdater
+from Flags import Flags
+from TargetSymbolsData import TargetSymbolsData
+from TargetSymbolsDataInjector import TargetSymbolsDataInjector
+from Communication import Communication
+from CommunicationData import CommunicationData
+from CommunicationData2 import CommunicationData2
+from ActionData import ActionData
+from Strategy import Strategy
+
 
 import asyncio
 import pandas as pd
+import time
 
 class Test:
     def __init__(self):
@@ -83,21 +94,175 @@ class Test:
                         AccountData.remove_order(row['id'])
 
 
-
-
 class TestMain:
+    def __init__(self):
+        Flags.initialize()
+        Settings.initialize()
+        TargetSymbolsData.initialize()
+        self.crp = CCXTRestApi()
+        tsdi = TargetSymbolsDataInjector(self.crp, 1000000.0)
+        #tsdi.inject_target_data()
+        #tsdi.inject_ohlcv_data(14)
+        tsdi.read_target_tickers()
+        tsdi.read_all_ohlcv()
+    
+    def __generate_test_action_data(self):
+        ad = ActionData()
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', order_type='limit', price=0, qty=5)
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', order_type='limit', price=0, qty=200)
+        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR/USDT:USDT', order_type='limit', price=0, qty=90)
+        ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', order_type='limit', price=0, qty=2)
+        return ad.get_action()
+
+    def __generate_test_exit_action_data(self):
+        ad = ActionData()
+        order_df = AccountData.get_order_df()
+        holding_df = AccountData.get_holding_df()
+        for index, order in order_df.iterrows():
+            ad.add_action(action='cancel', order_id=order['id'], ex_name=order['ex_name'], symbol=order['symbol'], order_type='', price=0, qty=0)
+        for index, holding in holding_df.iterrows():
+            ad.add_action(action='buy' if holding['side']=='sell' else 'sell', order_id='', ex_name=holding['ex_name'], symbol=holding['symbol'], order_type='limit', price=0, qty=holding['qty'])
+        return ad.get_action()
+
+    async def bot(self):
+        actions = self.__generate_test_action_data()
+        for i in range(10):
+            for action in actions:
+                if action['action'] == 'buy' or action['action'] == 'sell':
+                    if action['price'] > 0:
+                        pass
+                    else: #set limit price for bid/ask
+                        price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
+                        res = await self.crp.send_order(
+                            ex_name=action['ex_name'],
+                            symbol=action['symbol'],
+                            order_type=action['order_type'],
+                            side=action['action'],
+                            price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
+                            amount=float(action['qty'])
+                        )
+                        AccountData.add_order(
+                            ex_name=action['ex_name'],
+                            id=res['orderId'],
+                            symbol=action['symbol'],
+                            side=action['action'],
+                            type=action['order_type'],
+                            price=action['price'],
+                            avg_price=action['price'],
+                            status=str(res['status']).lower(),
+                            original_qty=float(action['qty']),
+                            executed_qty=0.0,
+                            fee=0.0,
+                            fee_currency='',
+                            timestamp=time.time()
+                        )
+                elif action['action'] == 'cancel':
+                    #cancelはaccount updater側で把握することにしている。
+                    res = await self.crp.cancel_order(
+                        action['ex_name'],
+                        action['symbol'],
+                        action['order_id']
+                        )
+                else:
+                    pass #do nothing
+            holding = AccountData.get_holding_df()
+            order = AccountData.get_order_df()
+            print('Holding:')
+            print(holding)
+            print('Order:')
+            print(order)
+            asyncio.sleep(60)
+        actions = self.__generate_test_exit_action_data()
+        for i in range(10): #do exit
+            if action['action'] == 'buy' or action['action'] == 'sell':
+                if action['price'] > 0:
+                    pass
+                else: #set limit price for bid/ask
+                    price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
+                    res = await self.crp.send_order(
+                        ex_name=action['ex_name'],
+                        symbol=action['symbol'],
+                        order_type=action['order_type'],
+                        side=action['action'],
+                        price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
+                        amount=float(action['qty'])
+                    )
+                    AccountData.add_order(
+                        ex_name=action['ex_name'],
+                        id=res['orderId'],
+                        symbol=action['symbol'],
+                        side=action['action'],
+                        type=action['order_type'],
+                        price=action['price'],
+                        avg_price=action['price'],
+                        status=str(res['status']).lower(),
+                        original_qty=float(action['qty']),
+                        executed_qty=0.0,
+                        fee=0.0,
+                        fee_currency='',
+                        timestamp=time.time()
+                    )
+            elif action['action'] == 'cancel':
+                #cancelはaccount updater側で把握することにしている。
+                res = await self.crp.cancel_order(
+                    action['ex_name'],
+                    action['symbol'],
+                    action['order_id']
+                    )
+            else:
+                pass #do nothing
+        holding = AccountData.get_holding_df()
+        order = AccountData.get_order_df()
+        print('Holding:')
+        print(holding)
+        print('Order:')
+        print(order)
+        asyncio.sleep(60)
+
+
+
+
+
     async def main(self):
-        test = Test()
+        ccxt_api = CCXTRestApi()
+        account = AccountUpdater(ccxt_api)
+        communication = Communication()
         await asyncio.gather(
-            test.start()
+            account.start_update(),
+            communication.main_loop(),
+            self.bot()
         )
+
+
+class TestComm:
+    def __init__(self):
+        self.communication = Communication()
+    
+    async def main(self):
+        await asyncio.gather(
+            self.communication.main_loop(),
+        )
+
+class TestStrategy:
+    def __init__(self):
+        Settings.initialize()
+        crp = CCXTRestApi()
+        TargetSymbolsData.initialize()
+        tsdi = TargetSymbolsDataInjector(crp, 1000000.0)
+        tsdi.inject_target_data()
+        strategy = Strategy(crp)
+        strategy.calc_change_ratio()
+        strategy.detect_top_bottom_targets()
+        
     
 
 if __name__ == '__main__':
-   #tm = TestMain()
-   #asyncio.run(tm.main())
-   test = Test()
-   po = asyncio.run(test.crp.fetch_positions('okx'))
-   df = CCXTRestApiParser.parse_fetch_holding_position_okx(po)
-   print(df)
+   #tc = TestComm()
+   #asyncio.run(tc.main())
+   tm = TestMain()
+   asyncio.run(tm.main())
+   #test = Test()
+   #po = asyncio.run(test.crp.fetch_positions('okx'))
+   #df = CCXTRestApiParser.parse_fetch_holding_position_okx(po)
+   #print(df)
     

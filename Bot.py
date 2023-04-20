@@ -7,6 +7,7 @@ from Settings import Settings
 from Flags import Flags
 from TargetSymbolsData import TargetSymbolsData
 from TargetSymbolsDataInjector import TargetSymbolsDataInjector
+from AccountData import AccountData
 
 
 class Bot:
@@ -17,12 +18,12 @@ class Bot:
         tsdi = TargetSymbolsDataInjector(self.crp, 1000000.0)
         tsdi.inject_target_data()
         tsdi.inject_ohlcv_data(14)
-
     
 
     async def start_bot(self):
         while Flags.get_system_flag():
             #download market data
+            
             #get action from startegy
             #take action
             #take log

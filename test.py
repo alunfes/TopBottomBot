@@ -111,10 +111,10 @@ class TestMain:
     '''
     def __generate_test_action_data(self):
         ad = ActionData()
-        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', order_type='limit', price=0, qty=5)
-        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', order_type='limit', price=0, qty=200)
-        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', order_type='limit', price=0, qty=90)
-        ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', order_type='limit', price=0, qty=2)
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', base_asset='GTC', quote_asset='USDT', order_type='limit', price=0, qty=5)
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', base_asset='CERL', quote_asset='USDT',order_type='limit', price=0, qty=200)
+        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', base_asset='CSPR', quote_asset='USDT',order_type='limit', price=0, qty=90)
+        ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', base_asset='CORE', quote_asset='USDT',order_type='limit', price=0, qty=2)
         return ad.get_action()
 
     def __generate_test_exit_action_data(self):
@@ -122,52 +122,54 @@ class TestMain:
         order_df = AccountData.get_order_df()
         holding_df = AccountData.get_holding_df()
         for index, order in order_df.iterrows():
-            ad.add_action(action='cancel', order_id=order['id'], ex_name=order['ex_name'], symbol=order['symbol'], order_type='', price=0, qty=0)
+            ad.add_action(action='cancel', order_id=order['id'], ex_name=order['ex_name'], symbol=order['symbol'], base_asset=order['base_asset'], quote_asset=order['quote_asset'], order_type='', price=0, qty=0)
         for index, holding in holding_df.iterrows():
-            ad.add_action(action='buy' if holding['side']=='sell' else 'sell', order_id='', ex_name=holding['ex_name'], symbol=holding['symbol'], order_type='limit', price=0, qty=holding['qty'])
+            ad.add_action(action='buy' if holding['side']=='sell' else 'sell', order_id='', ex_name=holding['ex_name'], symbol=holding['symbol'], base_asset=holding['base_asset'], quote_asset=holding['quote_asset'], order_type='limit', price=0, qty=holding['qty'])
         return ad.get_action()
 
     async def bot(self):
         actions = self.__generate_test_action_data()
+        for action in actions:
+            if action['action'] == 'buy' or action['action'] == 'sell':
+                if action['price'] > 0:
+                    pass
+                else: #set limit price for bid/ask
+                    price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
+                    res = await self.crp.send_order(
+                        ex_name=action['ex_name'],
+                        symbol=action['symbol'],
+                        order_type=action['order_type'],
+                        side=action['action'],
+                        price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
+                        amount=float(action['qty'])
+                    )
+                    AccountData.add_order(
+                        ex_name=action['ex_name'],
+                        id=res['orderId'],
+                        symbol=action['symbol'],
+                        base=action['base_asset'],
+                        quote=action['quote_asset'],
+                        side=action['action'],
+                        type=action['order_type'],
+                        price=action['price'],
+                        avg_price=action['price'],
+                        status=str(res['status']).lower(),
+                        original_qty=float(action['qty']),
+                        executed_qty=0.0,
+                        fee=0.0,
+                        fee_currency='',
+                        timestamp=time.time()
+                    )
+            elif action['action'] == 'cancel':
+                #cancelはaccount updater側で把握することにしている。
+                res = await self.crp.cancel_order(
+                    action['ex_name'],
+                    action['symbol'],
+                    action['order_id']
+                    )
+            else:
+                pass #do nothing
         for i in range(10):
-            for action in actions:
-                if action['action'] == 'buy' or action['action'] == 'sell':
-                    if action['price'] > 0:
-                        pass
-                    else: #set limit price for bid/ask
-                        price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
-                        res = await self.crp.send_order(
-                            ex_name=action['ex_name'],
-                            symbol=action['symbol'],
-                            order_type=action['order_type'],
-                            side=action['action'],
-                            price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
-                            amount=float(action['qty'])
-                        )
-                        AccountData.add_order(
-                            ex_name=action['ex_name'],
-                            id=res['orderId'],
-                            symbol=action['symbol'],
-                            side=action['action'],
-                            type=action['order_type'],
-                            price=action['price'],
-                            avg_price=action['price'],
-                            status=str(res['status']).lower(),
-                            original_qty=float(action['qty']),
-                            executed_qty=0.0,
-                            fee=0.0,
-                            fee_currency='',
-                            timestamp=time.time()
-                        )
-                elif action['action'] == 'cancel':
-                    #cancelはaccount updater側で把握することにしている。
-                    res = await self.crp.cancel_order(
-                        action['ex_name'],
-                        action['symbol'],
-                        action['order_id']
-                        )
-                else:
-                    pass #do nothing
             holding = AccountData.get_holding_df()
             order = AccountData.get_order_df()
             print('Holding:')
@@ -176,7 +178,7 @@ class TestMain:
             print(order)
             await asyncio.sleep(60)
         actions = self.__generate_test_exit_action_data()
-        for i in range(10): #do exit
+        for action in actions:
             if action['action'] == 'buy' or action['action'] == 'sell':
                 if action['price'] > 0:
                     pass
@@ -214,13 +216,14 @@ class TestMain:
                     )
             else:
                 pass #do nothing
-        holding = AccountData.get_holding_df()
-        order = AccountData.get_order_df()
-        print('Holding:')
-        print(holding)
-        print('Order:')
-        print(order)
-        asyncio.sleep(60)
+        for i in range(10): #do exit
+            holding = AccountData.get_holding_df()
+            order = AccountData.get_order_df()
+            print('Holding:')
+            print(holding)
+            print('Order:')
+            print(order)
+            asyncio.sleep(60)
 
 
 

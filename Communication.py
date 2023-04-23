@@ -50,6 +50,7 @@ class Communication:
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         self.chat_id = update.effective_chat.id
         await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
+        print('chat id=', self.chat_id)
     
     async def echo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.effective_chat.id, text='Res: ' + update.message.text)

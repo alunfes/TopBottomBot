@@ -42,12 +42,12 @@ class CCXTRestApiParser:
         # リストから必要な情報を取り出して辞書型のリストを作成する
         orders = []
         for d in all_orders:
-            order = {'id': d['id'], 'symbol': d['symbol'], 'status': d['status'], 'price': float(d['price']),'avg_price': float(d['average']) if d['average']!=None else float(d['price']), 'type':d['type'],
+            order = {'id': d['id'], 'symbol': d['symbol'], 'base_asset': str(d['symbol'].split('/')[0]), 'quote_asset': str(d['symbol'].split(':')[-1]), 'status': d['status'], 'price': float(d['price']),'avg_price': float(d['average']) if d['average']!=None else float(d['price']), 'type':d['type'],
                     'side': d['side'], 'original_qty': float(d['amount']), 'executed_qty': float(d['filled']),
                     'timestamp': pd.to_datetime(d['timestamp'], unit='ms'), 'fee': float(d['fee']['cost']), 'fee_currency': d['fee']['currency']}
             orders.append(order)
         # 辞書型のリストからdataframeを作成する
-        df = pd.DataFrame(orders, columns=['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type',
+        df = pd.DataFrame(orders, columns=['id', 'symbol', 'base_asset', 'quote_asset', 'status', 'price', 'avg_price', 'side', 'type',
                                         'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency'])
         df['ex_name'] = [ex_name] * len(df)
         return df
@@ -66,9 +66,11 @@ class CCXTRestApiParser:
         for item in closed_orders:
             id = item['id']
             symbol = item['symbol']
+            base_asset = str(item['symbol'].split('/')[0])
+            quote_asset = str(item['symbol'].split('/')[1])
             status = item['status'].lower()
             price = float(item['price'])
-            avg_price = float(item['avgPx']) if item['avgPx'] != ''  else 0.0
+            avg_price = float(item['average']) if item['average'] != ''  else 0.0
             side = item['side'].lower()
             otype = item['type'].lower()
             original_qty = float(item['amount'])
@@ -76,8 +78,8 @@ class CCXTRestApiParser:
             timestamp = item['timestamp']
             fee = float(item['fee']['cost'])
             fee_currency = item['fee']['currency']
-            processed_data.append([id, symbol, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
-        columns = ['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
+            processed_data.append([id, symbol, base_asset, quote_asset, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
+        columns = ['id', 'symbol', 'base_asset', 'quote_asset', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
         closed_orders_df = pd.DataFrame(processed_data, columns=columns)
         closed_orders_df['ex_name'] = ['okx'] * len(closed_orders_df)
         # open_ordersからDataFrameを作成
@@ -85,6 +87,8 @@ class CCXTRestApiParser:
         for item in open_orders:
             id = item['id']
             symbol = item['symbol']
+            base_asset = str(item['symbol'].split('/')[0])
+            quote_asset = str(item['symbol'].split(':')[-1])
             status = item['status']
             price = float(item['price'])
             avg_price = float(item['average']) if item['average'] != None  else 0.0
@@ -95,8 +99,8 @@ class CCXTRestApiParser:
             timestamp = item['timestamp']
             fee = float(item['fee']['cost'])
             fee_currency = item['fee']['currency']
-            processed_data.append([id, symbol, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
-        columns = ['id', 'symbol', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
+            processed_data.append([id, symbol, base_asset, quote_asset, status, price, avg_price, side, otype, original_qty, executed_qty, timestamp, fee, fee_currency])
+        columns = ['id', 'symbol', 'base_asset', 'quote_asset', 'status', 'price', 'avg_price', 'side', 'type', 'original_qty', 'executed_qty', 'ts', 'fee', 'fee_currency']
         open_orders_df = pd.DataFrame(processed_data, columns=columns)
         open_orders_df['ex_name'] = ['okx'] * len(open_orders_df)
         return pd.concat([closed_orders_df, open_orders_df], ignore_index=True)
@@ -119,6 +123,8 @@ class CCXTRestApiParser:
         if len(order_df) > 0 and len(binace_trades) > 0:
             order_cols = ['orderId', 'symbol', 'status', 'price', 'avgPrice', 'side', 'type', 'origQty', 'executedQty', 'time']
             order_df = pd.DataFrame(order_df, columns=order_cols)
+            order_df['base_asset'] = order_df['symbol'].str.replace('USDT', '')
+            order_df['quote_asset'] = ['USDT'] * len(order_df)
             order_df['price'] = order_df['price'].astype(float)
             order_df['avgPrice'] = order_df['avgPrice'].astype(float)
             order_df['origQty'] = order_df['origQty'].astype(float)
@@ -156,11 +162,13 @@ class CCXTRestApiParser:
         22  TRX/USDT:USDT  short  0.06381  100.0  1.681288e+12       -0.216356                -65.58           1.056954        0.0004
         '''
         # 必要なカラムを用意
-        columns = ['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio']
+        columns = ['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio']
         # カラムに対応する値を格納するリストを作成
         records = []
         for d in binance_position:
             symbol = d['symbol']
+            base_asset = d['symbol'].split('/')[0]
+            quote_asset = d['symbol'].split(':')[-1]
             side = d['side']
             price = float(d['entryPrice'])
             qty = float(d['contracts'])
@@ -169,10 +177,12 @@ class CCXTRestApiParser:
             unrealized_pnl_ratio = float(d['percentage']) if d['percentage'] != None else 0
             liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice'] != None else 0
             margin_ratio = float(d['marginRatio']) if d['marginRatio'] != None else 0
-            # 各行の値をタプルとしてリストに追加
-            records.append((symbol, side, price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio))
+            records.append({'symbol':symbol, 'base_asset':base_asset, 'quote_asset':quote_asset, 'side':side, 'price':price, 'qty':qty, 
+                            'timestamp':timestamp, 'unrealized_pnl_usd':unrealized_pnl, 'unrealized_pnl_ratio':unrealized_pnl_ratio, 
+                            'liquidation_price':liquidation_price, 'margin_ratio':margin_ratio})
         # リストからデータフレームを作成
         df = pd.DataFrame(records, columns=columns)
+        df['ex_name'] = ['binance'] * len(df)
         return df[df['side'].notnull()]
     
     
@@ -192,6 +202,8 @@ class CCXTRestApiParser:
             unrealized_pnl_ratio = (price - entry_price) / entry_price if item['side'] == 'long' else (entry_price - price) / entry_price
             formatted_data.append({
                 'symbol': item['symbol'],
+                'base_asset': str(item['symbol'].split('/')[0]),
+                'quote_asset': str(item['symbol'].split(':')[-1]),
                 'side': item['side'],
                 'price': float(item['entryPrice']),
                 'qty': float(item['contracts']),
@@ -202,7 +214,8 @@ class CCXTRestApiParser:
                 'margin_ratio': float(item['marginRatio']) if item['marginRatio'] != None else None,
             })
         # データフレームを生成
-        df = pd.DataFrame(formatted_data, columns=['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+        df = pd.DataFrame(formatted_data, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+        df['ex_name'] = ['bybit'] * len(df)
         return df
 
 
@@ -215,6 +228,8 @@ class CCXTRestApiParser:
         records = []
         for d in okx_position:
             symbol = d['symbol']
+            base_asset = str(d['symbol'].split('/')[0])
+            quote_asset = str(d['symbol'].split(':')[-1])
             side = d['side']
             price = float(d['info']['markPx'])
             qty = float(d['info']['pos'])
@@ -225,8 +240,9 @@ class CCXTRestApiParser:
             unrealized_pnl_ratio = (price - entry_price) / entry_price if side == 'long' else (entry_price - price) / entry_price
             margin_ratio = float(d['info']['mgnRatio'])
             liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice']!=None else None
-            records.append([symbol, side, entry_price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio])
-        df = pd.DataFrame(records, columns=['symbol', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+            records.append([symbol, base_asset, quote_asset, side, entry_price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio])
+        df = pd.DataFrame(records, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+        df['ex_name'] = ['okx'] * len(df)
         return df
 
 

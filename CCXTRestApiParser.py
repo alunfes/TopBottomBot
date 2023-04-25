@@ -166,20 +166,21 @@ class CCXTRestApiParser:
         # カラムに対応する値を格納するリストを作成
         records = []
         for d in binance_position:
-            symbol = d['symbol']
-            base_asset = d['symbol'].split('/')[0]
-            quote_asset = d['symbol'].split(':')[-1]
-            side = d['side']
-            price = float(d['entryPrice'])
-            qty = float(d['contracts'])
-            timestamp = d['timestamp']
-            unrealized_pnl = float(d['unrealizedPnl'])
-            unrealized_pnl_ratio = float(d['percentage']) if d['percentage'] != None else 0
-            liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice'] != None else 0
-            margin_ratio = float(d['marginRatio']) if d['marginRatio'] != None else 0
-            records.append({'symbol':symbol, 'base_asset':base_asset, 'quote_asset':quote_asset, 'side':side, 'price':price, 'qty':qty, 
-                            'timestamp':timestamp, 'unrealized_pnl_usd':unrealized_pnl, 'unrealized_pnl_ratio':unrealized_pnl_ratio, 
-                            'liquidation_price':liquidation_price, 'margin_ratio':margin_ratio})
+            if abs(float(d['contracts'])) > 0:
+                symbol = d['symbol']
+                base_asset = d['symbol'].split('/')[0]
+                quote_asset = d['symbol'].split(':')[-1]
+                side = d['side']
+                price = float(d['entryPrice'])
+                qty = float(d['contracts'])
+                timestamp = d['timestamp']
+                unrealized_pnl_usd = float(d['unrealizedPnl']) if d['unrealizedPnl'] != None else 0.0
+                unrealized_pnl_ratio = float(d['percentage']) if d['percentage'] != None else 0.0
+                liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice'] != None else 0.0
+                margin_ratio = float(d['marginRatio']) if d['marginRatio'] != None else 0.0
+                records.append({'symbol':symbol, 'base_asset':base_asset, 'quote_asset':quote_asset, 'side':side, 'price':price, 'qty':qty, 
+                                'timestamp':timestamp, 'unrealized_pnl_usd':unrealized_pnl_usd, 'unrealized_pnl_ratio':unrealized_pnl_ratio, 
+                                'liquidation_price':liquidation_price, 'margin_ratio':margin_ratio})
         # リストからデータフレームを作成
         df = pd.DataFrame(records, columns=columns)
         df['ex_name'] = ['binance'] * len(df)
@@ -208,7 +209,7 @@ class CCXTRestApiParser:
                 'price': float(item['entryPrice']),
                 'qty': float(item['contracts']),
                 'timestamp': item['timestamp'],
-                'unrealized_pnl_usd': float(item['unrealizedPnl']),
+                'unrealized_pnl_usd': float(item['unrealizedPnl']) if item['unrealizedPnl'] != None else 0.0,
                 'unrealized_pnl_ratio': float(unrealized_pnl_ratio),
                 'liquidation_price': float(item['liquidationPrice']),
                 'margin_ratio': float(item['marginRatio']) if item['marginRatio'] != None else None,
@@ -234,14 +235,14 @@ class CCXTRestApiParser:
             price = float(d['info']['markPx'])
             qty = float(d['info']['pos'])
             timestamp = d['timestamp']
-            unrealized_pnl = float(d['unrealizedPnl'])
+            unrealized_pnl_usd = float(d['unrealizedPnl'])
             entry_price = float(d['info']['avgPx'])
             # Calculate unrealized_pnl_ratio
             unrealized_pnl_ratio = (price - entry_price) / entry_price if side == 'long' else (entry_price - price) / entry_price
             margin_ratio = float(d['info']['mgnRatio'])
             liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice']!=None else None
-            records.append([symbol, base_asset, quote_asset, side, entry_price, qty, timestamp, unrealized_pnl, unrealized_pnl_ratio, liquidation_price, margin_ratio])
-        df = pd.DataFrame(records, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
+            records.append([symbol, base_asset, quote_asset, side, entry_price, qty, timestamp, unrealized_pnl_usd, unrealized_pnl_ratio, liquidation_price, margin_ratio])
+        df = pd.DataFrame(records, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
         df['ex_name'] = ['okx'] * len(df)
         return df
 
@@ -290,3 +291,6 @@ class CCXTRestApiParser:
         return df
 
 
+    @classmethod
+    def parse_fetch_trades_okx(cls, trades):
+        return pd.json_normalize(trades['data'])

@@ -7,7 +7,7 @@ class CommunicationData:
     @classmethod
     def initialize(cls):
         with cls.lock:
-            cls.messages = ['Communication is working properly.']
+            cls.messages = ['CommunicationData is working properly.']
 
     @classmethod
     def get_message(cls):
@@ -22,4 +22,4 @@ class CommunicationData:
     @classmethod
     def add_message(cls, msg_type, class_name, func_name, msg):
         with cls.lock:
-            cls.messages.append(msg_type+':'+'\n'+ class_name + '.'+func_name+':'+'\n'+msg)
+            cls.messages.append(msg_type+':'+'\n'+ class_name + '.'+func_name+':'+'\n'+str(msg))

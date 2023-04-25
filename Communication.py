@@ -1,77 +1,41 @@
 import yaml
-import logging
 import asyncio
-from telegram import Update
-from telegram.ext import filters, MessageHandler, ApplicationBuilder, CommandHandler, ContextTypes
+import time
 from CommunicationData import CommunicationData
+from Flags import Flags
+from slack_sdk.web import WebClient
+from slack_sdk.webhook import WebhookClient
+from slack_sdk.errors import SlackApiError
 
 
 class Communication:
     def __init__(self):
         CommunicationData.initialize()
-        self.__read_api()
-        # Create updater object and add handlers
-        self.application = ApplicationBuilder().token(self.api_key).build()
-        start_handler = CommandHandler('start', self.start)
-        echo_handler = MessageHandler(filters.TEXT & (~filters.COMMAND), self.echo)
-        self.application.add_handler(start_handler)
-        self.application.add_handler(echo_handler)
-        self.application.add_handler(CommandHandler("status", self.get_status))
-        self.chat_id = None
-        self.__get_comm_data_thread()
-        #self.application.run_polling()
-
-
-
-    def fire_and_forget(func):
-        def wrapper(*args, **kwargs):
-            loop = asyncio.get_event_loop()
-            func_coro = func(*args, **kwargs)
-            task = loop.create_task(func_coro)
-            task.add_done_callback(lambda _: None)
-        return wrapper
-
+        self.token = self.__read_api()
+        self.client = WebClient(token=self.token)
+    
     def __read_api(self):
         self.api_key = ''
         with open('./ignore/api.yaml', 'r') as f:
             api_keys = yaml.load(f, Loader=yaml.FullLoader)
-            self.api_key = api_keys['telegram']['public_key']
+            return api_keys['slack']['bot_token']
 
-
-    @fire_and_forget
-    async def __get_comm_data_thread(self):
-        while True:
-            if len(CommunicationData.messages) > 0:
-                if self.chat_id is not None:
-                    await self.send_message(self.chat_id, CommunicationData.messages[0])
-            await asyncio.sleep(1)
-
-
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        self.chat_id = update.effective_chat.id
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="I'm a bot, please talk to me!")
-        print('chat id=', self.chat_id)
-    
-    async def echo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await context.bot.send_message(chat_id=update.effective_chat.id, text='Res: ' + update.message.text)
-    
-    async def get_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        await update.message.reply_text('running')
-
-    async def send_message(self, chat_id, message: str) -> None:
-        await self.application.bot.send_message(chat_id=chat_id, text=message)
 
     async def main_loop(self):
-        while True:
-            await asyncio.sleep(5)
-    
+        while Flags.get_system_flag():
+            await asyncio.sleep(1)
+            if len(CommunicationData.messages) > 0:
+                self.__send_message_to_slack(CommunicationData.get_message())
 
-
+    def __send_message_to_slack(self, message):
+        try:
+            # Call the chat.postMessage method using the WebClient
+            response = self.client.chat_postMessage(text=message, channel="#topbottom")
+        except SlackApiError as e:
+            print(f"Error posting message: {e}")
 
 
 if __name__ == '__main__':
+    Flags.initialize()
     communication = Communication()
-    asyncio.gather(communication.main_loop())
-
-
-    
+    asyncio.run(communication.main_loop())

@@ -8,7 +8,6 @@ from TargetSymbolsData import TargetSymbolsData
 from TargetSymbolsDataInjector import TargetSymbolsDataInjector
 from Communication import Communication
 from CommunicationData import CommunicationData
-from CommunicationData2 import CommunicationData2
 from ActionData import ActionData
 from Strategy import Strategy
 
@@ -112,7 +111,7 @@ class TestMain:
     def __generate_test_action_data(self):
         ad = ActionData()
         ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', base_asset='GTC', quote_asset='USDT', order_type='limit', price=0, qty=5)
-        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', base_asset='CERL', quote_asset='USDT',order_type='limit', price=0, qty=200)
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', base_asset='CERL', quote_asset='USDT',order_type='limit', price=0, qty=230)
         ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', base_asset='CSPR', quote_asset='USDT',order_type='limit', price=0, qty=90)
         ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', base_asset='CORE', quote_asset='USDT',order_type='limit', price=0, qty=2)
         return ad.get_action()
@@ -178,6 +177,9 @@ class TestMain:
             print(order)
             await asyncio.sleep(60)
         actions = self.__generate_test_exit_action_data()
+        print('--------------------------------------------')
+        print('Exit Mode')
+        print('--------------------------------------------')
         for action in actions:
             if action['action'] == 'buy' or action['action'] == 'sell':
                 if action['price'] > 0:
@@ -196,6 +198,8 @@ class TestMain:
                         ex_name=action['ex_name'],
                         id=res['orderId'],
                         symbol=action['symbol'],
+                        base=action['base_asset'],
+                        quote=action['quote_asset'],
                         side=action['action'],
                         type=action['order_type'],
                         price=action['price'],
@@ -223,7 +227,7 @@ class TestMain:
             print(holding)
             print('Order:')
             print(order)
-            asyncio.sleep(60)
+            await asyncio.sleep(60)
 
 
 

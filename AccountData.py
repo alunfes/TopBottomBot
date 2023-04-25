@@ -45,6 +45,7 @@ class AccountData:
         #performance
         cls.num_trade = 0
         cls.num_win = 0
+        cls.total_pnl = 0
         cls.total_realized_pnl = 0
         cls.total_unrealized_pnl = 0
         cls.realized_pnls = {} #ex_name-base-quote, realized_pnl (positionと反対方向の約定が発生する度にUSDTベースでのrealized pnlを保有銘柄毎に加算する、)
@@ -120,7 +121,10 @@ class AccountData:
             cls.holding_symbol.append(symbol)
             cls.holding_base_asset.append(base_asset)
             cls.holding_quote_asset.append(quote_asset)
-            cls.holding_side.append(side)
+            if side == 'buy' or side == 'sell':
+                cls.holding_side.append({'buy':'long', 'sell':'short'}[side])
+            else:
+                cls.holding_side.append(side)
             cls.holding_price.append(price)
             cls.holding_qty.append(qty)
             cls.holding_timestamp.append(timestamp)
@@ -312,17 +316,20 @@ class AccountData:
     def set_total_fees(cls, ex_name, base, quote, fee):
         with cls.lock:
             cls.total_fees[ex_name+'-'+base+'/'+quote] = fee
+            cls.total_fee = sum(list(cls.total_fees.values()))
 
     @classmethod
     def get_total_fee(cls):
         with cls.lock:
             return cls.total_fee
 
+    '''
     @classmethod
     def set_total_fee(cls, value):
         with cls.lock:
             cls.total_fee = value
-
+    '''
+    
     @classmethod
     def get_total_pnl_log(cls):
         with cls.lock:
@@ -356,6 +363,16 @@ class AccountData:
     def set_trades_df(cls, value):
         with cls.lock:
             cls.trades_df = value
+
+    @classmethod
+    def set_total_pnl(cls, pnl):
+        with cls.lock:
+            cls.total_pnl = pnl
+    
+    @classmethod
+    def get_total_pnl(cls):
+        with cls.lock:
+            return cls.total_pnl
 
         
 

@@ -259,7 +259,7 @@ class CCXTRestApi:
             closed = await self.ccxt_exchanges['okx'].fetchClosedOrders()
             return {'open_orders':opens, 'closed_orders':closed}
         else:
-            orders = await self.ccxt_exchanges[ex_name].fetch_orders()
+            orders = await self.ccxt_exchanges[ex_name].fetch_orders(limit=100)
         return orders
 
         
@@ -405,9 +405,12 @@ if __name__ == '__main__':
     #df = pd.DataFrame(res)
     #print(df)
     #time.sleep(3)
-    res = asyncio.run(crp.fetch_order(ex_name='okx', order_id='570008769909162000', symbol='CSPR-USDT-SWAP'))
+    orders = asyncio.run(crp.fetch_order(ex_name='okx', symbol='CSPR/USDT:USDT', order_id='570346326182264832'))
+    print(orders)
+    #df = pd.json_normalize(orders['data'])
     #res = asyncio.run(crp.ccxt_exchanges['binance'].fetchTrades(symbol='TRXUSDT'))
-    print(df)
+    #print(df)
+    #df.to_csv('./Data/okx_trades.csv', index=False)
     #pd.DataFrame(res['assets']).to_csv('./bina_asset.csv')
     #pd.DataFrame(res['positions']).to_csv('./bina_posi.csv')
     #df = pd.DataFrame(res['info']['result']['list'])

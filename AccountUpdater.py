@@ -425,7 +425,7 @@ class AccountUpdater:
         holding_df = AccountData.get_holding_df()
         for index, row in holding_df.iterrows():
             matched_position_df = curernt_position_df[(curernt_position_df['ex_name'] == row['ex_name']) & (curernt_position_df['base_asset'] == row['base_asset']) & (curernt_position_df['quote_asset'] == row['quote_asset'])]
-            if len(matched_position_df) == 0: #no matched holding data from API not found
+            if len(matched_position_df) == 0: #AccountDataにあるholdingが実際には存在しない
                 DisplayMessage.display_message('AccountUpdater', '__check_positions', 'error', ['No matched holding is not found!',row])
             else:#check positon data of matched data
                 if matched_position_df['side'].iloc[0].lower() != row['side']:
@@ -472,7 +472,7 @@ class AccountUpdater:
                 )
             else:#executionをチェックした直後に全約定して該当のholdingがなくなることがあるので、対象のorderにのみ約定チェックを行う。
                 order_df = AccountData.get_order_df()
-                matched_order_df = order_df[order_df['ex_name'] == holding['ex_name'] & order_df['base_asset']==holding['base_asset'] & order_df['quote_asset']==holding['quote_asset']]
+                matched_order_df = order_df[(order_df['ex_name'] == holding['ex_name']) & (order_df['base_asset']==holding['base_asset']) & (order_df['quote_asset']==holding['quote_asset'])]
                 if len(matched_order_df) > 0:
                     res = await self.__check_execution_of_specific_order(holding['ex_name'], holding['symbol'], matched_order_df['id'].iloc(0))
                     if res == None: #order dataが存在しない
@@ -484,8 +484,8 @@ class AccountUpdater:
                                                     holding,
                                                     'Account order',
                                                     order_df,
-                                                    'matched current position dict',
-                                                    matched_current_position_dict])
+                                                    'matched current position df',
+                                                    matched_current_position_df])
         print('Completed sync all holdings.')
 
 

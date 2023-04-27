@@ -212,7 +212,7 @@ class CCXTRestApiParser:
                 'unrealized_pnl_usd': float(item['unrealizedPnl']) if item['unrealizedPnl'] != None else 0.0,
                 'unrealized_pnl_ratio': float(unrealized_pnl_ratio),
                 'liquidation_price': float(item['liquidationPrice']),
-                'margin_ratio': float(item['marginRatio']) if item['marginRatio'] != None else None,
+                'margin_ratio': float(item['marginRatio']) if item['marginRatio'] != None else 0.0,
             })
         # データフレームを生成
         df = pd.DataFrame(formatted_data, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
@@ -240,7 +240,7 @@ class CCXTRestApiParser:
             # Calculate unrealized_pnl_ratio
             unrealized_pnl_ratio = (price - entry_price) / entry_price if side == 'long' else (entry_price - price) / entry_price
             margin_ratio = float(d['info']['mgnRatio'])
-            liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice']!=None else None
+            liquidation_price = float(d['liquidationPrice']) if d['liquidationPrice']!=None else 0.0
             records.append([symbol, base_asset, quote_asset, side, entry_price, qty, timestamp, unrealized_pnl_usd, unrealized_pnl_ratio, liquidation_price, margin_ratio])
         df = pd.DataFrame(records, columns=['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio'])
         df['ex_name'] = ['okx'] * len(df)

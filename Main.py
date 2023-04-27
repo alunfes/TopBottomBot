@@ -8,6 +8,7 @@ from AccountUpdater import AccountUpdater
 from Bot import Bot
 from Flags import Flags
 from CCXTRestApi import CCXTRestApi
+from DisplayMessage import DisplayMessage
 
 import pandas as pd
 import asyncio

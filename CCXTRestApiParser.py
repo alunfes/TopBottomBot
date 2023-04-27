@@ -162,7 +162,7 @@ class CCXTRestApiParser:
         22  TRX/USDT:USDT  short  0.06381  100.0  1.681288e+12       -0.216356                -65.58           1.056954        0.0004
         '''
         # 必要なカラムを用意
-        columns = ['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio']
+        columns = ['symbol', 'base_asset', 'quote_asset', 'side', 'price', 'qty', 'timestamp', 'unrealized_pnl_usd', 'unrealized_pnl_ratio', 'liquidation_price', 'margin_ratio']
         # カラムに対応する値を格納するリストを作成
         records = []
         for d in binance_position:
@@ -294,3 +294,67 @@ class CCXTRestApiParser:
     @classmethod
     def parse_fetch_trades_okx(cls, trades):
         return pd.json_normalize(trades['data'])
+    
+
+    '''
+    order -> {'orderId': '32945045423', 'symbol': 'XRPUSDT', 'status': 'NEW', 'clientOrderId': 'TF1xtGYnCJFTQh48NUPjDd', 'price': '0.4500', 'avgPrice': '0.00000', 'origQty': '15', 'executedQty': '0', 'cumQuote': '0', 'timeInForce': 'GTC', 'type': 'LIMIT', 'reduceOnly': False, 'closePosition': False, 'side': 'BUY', 'positionSide': 'BOTH', 'stopPrice': '0', 'workingType': 'CONTRACT_PRICE', 'priceProtect': False, 'origType': 'LIMIT', 'time': '1682483987613', 'updateTime': '1682483987613'}
+    trades -> [{'symbol': 'CELRUSDT', 'id': '159843507', 'orderId': '2827747675', 'side': 'BUY', 'price': '0.02624', 'qty': '200', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '5.24800', 'commission': '0.00209919', 'commissionAsset': 'USDT', 'time': '1681971413213', 'positionSide': 'BOTH', 'buyer': True, 'maker': False}, {'symbol': 'CELRUSDT', 'id': '159867547', 'orderId': '2828056546', 'side': 'BUY', 'price': '0.02602', 'qty': '200', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '5.20400', 'commission': '0.00208160', 'commissionAsset': 'USDT', 'time': '1681976259062', 'positionSide': 'BOTH', 'buyer': True, 'maker': False}, {'symbol': 'GTCUSDT', 'id': '125445719', 'orderId': '2068027124', 'side': 'BUY', 'price': '1.696', 'qty': '5', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '8.4800', 'commission': '0.00339200', 'commissionAsset': 'USDT', 'time': '1681976600412', 'positionSide': 'BOTH', 'buyer': True, 'maker': False}, {'symbol': 'CELRUSDT', 'id': '159868555', 'orderId': '2828072296', 'side': 'BUY', 'price': '0.02606', 'qty': '200', 'realizedPnl': '0', 'marginAsset': 'USDT', 'quoteQty': '5.21200', 'commission': '0.00208480', 'commissionAsset': 'USDT', 'time': '1681976600713', 'positionSide': 'BOTH', 'buyer': True, 'maker': False}, {'symbol': 'GTCUSDT', 'id': '125445951', 'orderId': '2068034747', 'side': 'SELL', 'price': '1.694', 'qty': '5', 'realizedPnl': '-0.01000000', 'marginAsset': 'USDT', 'quoteQty': '8.4700', 'commission': '0.00338800', 'commissionAsset': 'USDT', 'time': '1681976841220', 'positionSide': 'BOTH', 'buyer': False, 'maker': False}, {'symbol': 'CELRUSDT', 'id': '159869392', 'orderId': '2828085592', 'side': 'SELL', 'price': '0.02602', 'qty': '600', 'realizedPnl': '-0.05200000', 'marginAsset': 'USDT', 'quoteQty': '15.61200', 'commission': '0.00624480', 'commissionAsset': 'USDT', 'time': '1681976842647', 'positionSide': 'BOTH', 'buyer': False, 'maker': False},
+    '''
+    @classmethod
+    def parse_fetch_order_binance(cls, order, trades):
+        if 'status' in order:
+            commission = 0
+            commission_asset = ''
+            for trade in trades:
+                if trade['symbol'] == order['symbol']:
+                    commission = trade['commission']
+                    commission_asset = trade['commissionAsset']
+            return pd.DataFrame({'ex_name':'binance', 'id':order['orderId'], 'symbol':order['symbol'], 'base_asset':order['symbol'].replace('USDT',''), 'quote_asset':'USDT',
+             'status':order['status'].lower(), 'price':float(order['price']), 'avg_price':float(order['avgPrice']), 'side':order['side'],
+               'type':order['type'].lower(), 'original_qty':float(order['origQty']), 'executed_qty':float(order['executedQty']),
+               'ts':order['time'], 'fee':float(commission), 'fee_currency':commission_asset})
+        else:
+            print('****************************************')
+            print('Binance Order data is invalid to parse!')
+            print(order)
+            print('****************************************')
+
+    '''
+    {'info': {'orderId': 'b1a18135-5982-4758-ada4-58026d1a2c8a', 'orderLinkId': '', 'blockTradeId': '', 'symbol': 'OPUSDT', 'price': '2.1104', 'qty': '1.0', 'side': 'Sell', 'isLeverage': '', 'positionIdx': '0', 'orderStatus': 'Filled', 'cancelType': 'UNKNOWN', 'rejectReason': 'EC_NoError', 'avgPrice': '2.220720000', 'leavesQty': '0.0', 'leavesValue': '0', 'cumExecQty': '1.0', 'cumExecValue': '2.22072', 'cumExecFee': '0.00133244', 'timeInForce': 'IOC', 'orderType': 'Market', 'stopOrderType': 'UNKNOWN', 'orderIv': '', 'triggerPrice': '0.0000', 'takeProfit': '0.0000', 'stopLoss': '0.0000', 'tpTriggerBy': 'UNKNOWN', 'slTriggerBy': 'UNKNOWN', 'triggerDirection': '0', 'triggerBy': 'UNKNOWN', 'lastPriceOnCreated': '0.0000', 'reduceOnly': False, 'closeOnTrigger': False, 'createdTime': '1681285869078', 'updatedTime': '1681285869080', 'placeType': ''}, 'id': 'b1a18135-5982-4758-ada4-58026d1a2c8a', 'clientOrderId': None, 'timestamp': 1681285869078, 'datetime': '2023-04-12T07:51:09.078Z', 'lastTradeTimestamp': 1681285869080, 'symbol': 'OP/USDT:USDT', 'type': 'market', 'timeInForce': 'IOC', 'postOnly': False, 'reduceOnly': False, 'side': 'sell', 'price': 2.1104, 'stopPrice': None, 'triggerPrice': None, 'amount': 1.0, 'cost': 2.22072, 'average': 2.22072, 'filled': 1.0, 'remaining': 0.0, 'status': 'closed', 'fee': {'cost': 0.00133244, 'currency': 'USDT'}, 'trades': [], 'fees': [{'cost': 0.00133244, 'currency': 'USDT'}]}
+    '''
+    @classmethod
+    def parse_fetch_order_bybit(cls, order):
+        if 'status' in order:
+            return pd.DataFrame({'ex_name':'bybit', 'id':order['id'], 'symbol':order['symbol'], 'base_asset':order['symbol'].split('/')[0], 
+                                 'quote_asset':order['symbol'].split(':')[-1], 'status':order['status'].lower(), 'price':float(order['info']['price']),
+                                   'avg_price':float(order['info']['avgPrice']), 'side':order['side'],'type':order['type'].lower(), 
+                                   'original_qty':float(order['filled']) + float(order['remaining']), 'executed_qty':float(order['filled']),'ts':order['timestamp'], 
+                                   'fee':float(order['fees']['cost']), 'fee_currency':order['fees']['currency']})
+        else:
+            print('****************************************')
+            print('Bybit Order data is invalid to parse!')
+            print(order)
+            print('****************************************')
+
+
+
+    '''
+    {'info': {'accFillSz': '10', 'algoClOrdId': '', 'algoId': '', 'avgPx': '0.081858', 'cTime': '1681285189513', 'cancelSource': '', 'cancelSourceReason': '', 'category': 'normal', 'ccy': '', 'clOrdId': 'e847386590ce4dBC6b998cb4b173f5e2', 'fee': '-0.40929', 'feeCcy': 'USDT', 'fillPx': '0.08185', 'fillSz': '2', 'fillTime': '1681285189514', 'instId': 'DOGE-USDT-SWAP', 'instType': 'SWAP', 'lever': '3.0', 'ordId': '566286360827858944', 'ordType': 'market', 'pnl': '0', 'posSide': 'net', 'px': '', 'quickMgnType': '', 'rebate': '0', 'rebateCcy': 'USDT', 'reduceOnly': 'false', 'side': 'sell', 'slOrdPx': '', 'slTriggerPx': '', 'slTriggerPxType': '', 'source': '', 'state': 'filled', 'sz': '10', 'tag': 'e847386590ce4dBC', 'tdMode': 'cross', 'tgtCcy': '', 'tpOrdPx': '', 'tpTriggerPx': '', 'tpTriggerPxType': '', 'tradeId': '224719298', 'uTime': '1681285189515'}, 
+    'id': '566286360827858944', 'clientOrderId': 'e847386590ce4dBC6b998cb4b173f5e2', 'timestamp': 1681285189513, 'datetime': '2023-04-12T07:39:49.513Z', 'lastTradeTimestamp': 1681285189514, 'symbol': 'DOGE/USDT:USDT', 'type': 'market', 'timeInForce': 'IOC', 'postOnly': None, 'side': 'sell', 'price': 0.081858, 'stopLossPrice': None, 'takeProfitPrice': None, 'stopPrice': None, 'triggerPrice': None, 'average': 0.081858, 'cost': 818.58, 'amount': 10.0, 'filled': 10.0, 'remaining': 0.0, 'status': 'closed', 'fee': {'cost': 0.40929, 'currency': 'USDT'}, 'trades': [], 'reduceOnly': False, 'fees': [{'cost': 0.40929, 'currency': 'USDT'}]}
+    '''
+    @classmethod
+    def parse_fetch_order_okx(cls, order):
+        if 'status' in order:
+            return pd.DataFrame({'ex_name':'okx', 'id':order['id'], 'symbol':order['symbol'], 'base_asset':order['symbol'].split('/')[0], 
+                                 'quote_asset':order['symbol'].split(':')[-1], 'status':order['status'].lower(), 'price':float(order['info']['price']),
+                                   'avg_price':float(order['average']), 'side':order['side'],'type':order['type'].lower(), 
+                                   'original_qty':float(order['filled']) + float(order['remaining']), 'executed_qty':float(order['filled']),'ts':order['timestamp'], 
+                                   'fee':float(order['fees']['cost']), 'fee_currency':order['fees']['currency']})
+        else:
+            print('****************************************')
+            print('OKX Order data is invalid to parse!')
+            print(order)
+            print('****************************************')
+
+
+

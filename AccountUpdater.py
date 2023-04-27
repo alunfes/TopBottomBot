@@ -7,6 +7,8 @@ from CCXTRestApiParser import CCXTRestApiParser
 from CCXTRestApi import CCXTRestApi
 from Settings import Settings
 from Flags import Flags
+from DisplayMessage import DisplayMessage
+from CommunicationData import CommunicationData
 
 
 '''
@@ -69,7 +71,7 @@ class AccountUpdater:
             self.__check_executions(api_orders_df)
             con_posi_df = await self.__get_all_current_positions(Settings.exchanges)
             self.__check_positions(con_posi_df)
-            self.__sync_holding_data(con_posi_df)
+            await self.__sync_holding_data(con_posi_df)
             self.__sync_order_data(api_orders_df)
             self.__update_unrealized_pnl()
             self.__update_total_pnl()
@@ -82,6 +84,7 @@ class AccountUpdater:
             print('num trade=', AccountData.get_num_trade())
             print('num win=', AccountData.get_num_win())
             print('********************************************')
+            CommunicationData.add_message('update', 'AccountUpdater', 'start_update', 'total pnl='+str(AccountData.get_total_pnl()))
             num_account_loop += 1
             await asyncio.sleep(Settings.account_update_freq)
 
@@ -137,11 +140,7 @@ class AccountUpdater:
                                   'avg_price':order['average'], 'side':order['side'], 'type':order['type'], 'original_qty':order['amount'],
                                   'executed_qty':order['filled'], 'ts':order['timestamp'], 'fee':order['fee']['cost'], 'fee_currency':order['fee']['currency']})
                 else:
-                    print('************************************')
-                    print('Order length invalid!')
-                    print(account_order)
-                    print(order)
-                    print('************************************')
+                    DisplayMessage.display_message('AccountUpdater','__get_okx_all_orders', 'error', ['Order length invalid!', account_order, order])
         if len(dict_list) > 0:
             return pd.DataFrame(dict_list)
         else:
@@ -171,18 +170,17 @@ class AccountUpdater:
         ・exec qtyが変化せずに、cancelになったときは単純にorder削除。Openの時はstatusのみ更新。
         ・okx以外のorderがlatest_order_dfに存在しない場合は何らかの問題がある。okxの場合はキャンセルとして処理する。
         '''
-
         def __check_order_matching(matched_api_order_df, account_order_df):
             if len(matched_api_order_df) == 0: #matched order data not found
                 if account_order_df['ex_name'] == 'okx':
                     print('OKX ', account_order_df['side'], ' order for ', account_order_df['symbol'], ' has been canceled.')
+                    DisplayMessage('AccounUpdater','__check_order_matching', ['OKX '+account_order_df['side']+ ' order for '+account_order_df['symbol']+' has been canceled.'] )
                     AccountData.remove_order(account_order_df['id'])
                     return False
                 else:
-                    print('AccountData order ', account_order_df['id'], '  was not found !')
+                    DisplayMessage.display_message('AccounUpdater','__check_order_matching', 'error', ['AccountData order '+ account_order_df['id']+ '  was not found !'])    
             elif len(matched_api_order_df) > 1: #multiple orders were identified
-                print('Fund multiple orders')
-                print(matched_api_order_df)
+                DisplayMessage.display_message('AccounUpdater','__check_order_matching', 'error', ['Fund multiple orders', matched_api_order_df])
                 return True
             else:
                 return True
@@ -194,11 +192,11 @@ class AccountUpdater:
             elif matched_api_order_df['executed_qty'].iloc[0] == account_order_df['executed_qty']:
                 return 0
             elif matched_api_order_df['executed_qty'].iloc[0] < account_order_df['executed_qty']:
-                print('Executed_qty was decreased in ', account_order_df['id'], '!')
-                print('matched_df:')
-                print(matched_api_order_df)
-                print('AccountData:')
-                print(account_order_df)
+                DisplayMessage('AccountUpdater','__check_exec_qty_validation',['Executed_qty was decreased in '+ account_order_df['id']+ '!',
+                                                                               'matched_df:',
+                                                                               matched_api_order_df,
+                                                                               'AccountData:',
+                                                                               account_order_df])
                 return -1
 
         def __calc_fee(ex_name, base, quote, additional_fee, fee_currency, price):
@@ -251,7 +249,8 @@ class AccountUpdater:
 
 
         def __process_additional_execution(matched_api_order_dict, matched_holding_df, additional_exec_qty):
-            print('Additional execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            #print('Additional execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            DisplayMessage.display_message('AccountUpdater', '__process_additional_execution', 'message', [matched_api_order_dict['ex_name']+ ':'+ matched_api_order_dict['symbol']+ '-'+ matched_api_order_dict['side']+ ' x '+ str(matched_api_order_dict['executed_qty']) + ' @ '+ str(matched_api_order_dict['avg_price'])])
             new_avg_price = (matched_holding_df['price'].iloc[0] * matched_holding_df['qty'].iloc[0] + matched_api_order_dict['avg_price'] * matched_api_order_dict['executed_qty']) / (matched_holding_df['qty'].iloc[0] + matched_api_order_dict['executed_qty'])
             AccountData.update_holding(
                 ex_name = matched_holding_df['ex_name'].iloc[0],
@@ -270,7 +269,8 @@ class AccountUpdater:
 
 
         def __process_partial_exit_execution(matched_api_order_dict, matched_holding_df, additional_exec_qty):
-            print('Patial exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            #print('Patial exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            DisplayMessage.display_message('AccountUpdater', '__process_partial_exit_execution', 'message', ['Patial exit execution: '+ matched_api_order_dict['ex_name']+ ':'+ matched_api_order_dict['symbol']+ '-'+ matched_api_order_dict['side']+ ' x '+ str(matched_api_order_dict['executed_qty'])+ ' @ '+ str(matched_api_order_dict['avg_price'])])
             realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['symbol'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
             AccountData.set_realized_pnls(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], realized_pnl)
             AccountData.update_holding(
@@ -289,7 +289,8 @@ class AccountUpdater:
 
         
         def __process_full_exit_execution(matched_api_order_dict, matched_holding_df, additional_exec_qty):
-            print('Full exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            #print('Full exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
+            DisplayMessage.display_message('AccountUpdater', '__process_full_exit_execution', 'message', ['Full exit execution: '+ matched_api_order_dict['ex_name']+ ':'+ matched_api_order_dict['symbol']+ '-'+ matched_api_order_dict['side']+ ' x '+ str(matched_api_order_dict['executed_qty'])+ ' @ '+ str(matched_api_order_dict['avg_price'])])
             realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['symbol'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
             AccountData.set_realized_pnls(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], realized_pnl)
             AccountData.remove_holding(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0])
@@ -425,32 +426,31 @@ class AccountUpdater:
         for index, row in holding_df.iterrows():
             matched_position_df = curernt_position_df[(curernt_position_df['ex_name'] == row['ex_name']) & (curernt_position_df['base_asset'] == row['base_asset']) & (curernt_position_df['quote_asset'] == row['quote_asset'])]
             if len(matched_position_df) == 0: #no matched holding data from API not found
-                print('No matched holding is not found!')
-                print('AccountData.holding')
-                print(row)
-            else:
+                DisplayMessage.display_message('AccountUpdater', '__check_positions', 'error', ['No matched holding is not found!',row])
+            else:#check positon data of matched data
                 if matched_position_df['side'].iloc[0].lower() != row['side']:
-                    print('Holding side is not matched in ', row['ex_name'], '-', row['symbol'], ' with API data !')
-                    print(matched_position_df['side'].iloc[0])
-                    print(row)
+                    DisplayMessage.display_message('AccountUpdater', '__check_positions', 'error', 
+                                                   ['Holding side is not matched in '+row['ex_name']+ '-'+ row['symbol']+' with API data !',
+                                                   matched_position_df['side'].iloc[0],
+                                                   row])
                 if abs(matched_position_df['price'].iloc[0] - row['price']) >= 0.1 * row['price']:
-                    print('Holding price is not matched in ', row['ex_name'], '-', row['symbol'], ' with API data !')
-                    print(matched_position_df['price'].iloc[0])
-                    print(row)
-            AccountData.update_holding(
-                ex_name=matched_position_df['ex_name'].iloc[0],
-                base_asset=matched_position_df['base_asset'].iloc[0],
-                quote_asset=matched_position_df['quote_asset'].iloc[0],
-                price=float(matched_position_df['price'].iloc[0]),
-                qty=float(matched_position_df['qty'].iloc[0]),
-                unrealized_pnl_usd=float(matched_position_df['unrealized_pnl_usd'].iloc[0]),
-                unrealized_pnl_ratio=float(matched_position_df['unrealized_pnl_ratio'].iloc[0]),
-                liquidation_price=float(matched_position_df['liquidation_price'].iloc[0]),
-                margin_ratio=float(matched_position_df['margin_ratio'].iloc[0])
-            )
+                    DisplayMessage.display_message('AccountUpdater', '__check_positions', 'error', ['Holding price is not matched in '+ row['ex_name']+ '-'+ row['symbol']+ ' with API data !',
+                                                                                                    matched_position_df['price'].iloc[0],
+                                                                                                    row])
+                AccountData.update_holding(
+                    ex_name=matched_position_df['ex_name'].iloc[0],
+                    base_asset=matched_position_df['base_asset'].iloc[0],
+                    quote_asset=matched_position_df['quote_asset'].iloc[0],
+                    price=float(matched_position_df['price'].iloc[0]),
+                    qty=float(matched_position_df['qty'].iloc[0]),
+                    unrealized_pnl_usd=float(matched_position_df['unrealized_pnl_usd'].iloc[0]),
+                    unrealized_pnl_ratio=float(matched_position_df['unrealized_pnl_ratio'].iloc[0]),
+                    liquidation_price=float(matched_position_df['liquidation_price'].iloc[0]),
+                    margin_ratio=float(matched_position_df['margin_ratio'].iloc[0])
+                )
 
 
-    def __sync_holding_data(self, curernt_position_df):
+    async def __sync_holding_data(self, curernt_position_df):
         holding_df = AccountData.get_holding_df()
         for index, holding in holding_df.iterrows():
             matched_current_position_df = curernt_position_df[(curernt_position_df['ex_name'] == holding['ex_name']) & (curernt_position_df['base_asset'] == holding['base_asset']) & (curernt_position_df['quote_asset'] == holding['quote_asset'])]
@@ -470,12 +470,22 @@ class AccountUpdater:
                     liquidation_price=matched_current_position_dict['liquidation_price'],
                     margin_ratio=matched_current_position_dict['margin_ratio']
                 )
-            else:
-                print('Matched position df size is not 1 !')
-                print('current positon df:')
-                print(matched_current_position_dict)
-                print('Holding df:')
-                print(holding_df)
+            else:#executionをチェックした直後に全約定して該当のholdingがなくなることがあるので、対象のorderにのみ約定チェックを行う。
+                order_df = AccountData.get_order_df()
+                matched_order_df = order_df[order_df['ex_name'] == holding['ex_name'] & order_df['base_asset']==holding['base_asset'] & order_df['quote_asset']==holding['quote_asset']]
+                if len(matched_order_df) > 0:
+                    res = await self.__check_execution_of_specific_order(holding['ex_name'], holding['symbol'], matched_order_df['id'].iloc(0))
+                    if res == None: #order dataが存在しない
+                        DisplayMessage.display_message('AccountUpdater','__sync_holding_data','error',['Holding data is not found in CEX and order!', holding, order_df])
+                else:#matchするorderがAccountDataにない。
+                    DisplayMessage.display_message('AccountUpdater', '__sync_holding_data', 'error', 
+                                                   ['Holding is not found in AccountData !',
+                                                    'Account holding',
+                                                    holding,
+                                                    'Account order',
+                                                    order_df,
+                                                    'matched current position dict',
+                                                    matched_current_position_dict])
         print('Completed sync all holdings.')
 
 
@@ -498,11 +508,44 @@ class AccountUpdater:
                     fee_currency=matched_current_order_dict['fee_currency'],
                 )
             else:
-                print('matched order data size is ', len(matched_current_order_df), ' not 1 !')
-                print('matched_current_order_df')
-                print(matched_current_order_df)
-                print('AccountData.order_df')
-                print(order)
+                DisplayMessage.display_message('AccountUpdater','__sync_order_data', 'error',
+                                               ['matched order data size is '+ str(len(matched_current_order_df))+' not 1 !',
+                                                'matched_current_order_df',
+                                                matched_current_order_df,
+                                                'AccountData.order_df',
+                                                order])
+
+
+    '''
+    get specific order and check execution
+    '''
+    async def __check_execution_of_specific_order(self, ex_name, symbol, order_id):
+        order = await self.crp.fetch_order(ex_name=ex_name, symbol=symbol, order_id=order_id)
+        if 'status' in order:
+            order_df = pd.DataFrame()
+            if ex_name == 'binance':
+                trades = await self.crp.get_trades('binance')
+                order_df = CCXTRestApiParser.parse_fetch_order_binance(order, trades)
+            elif ex_name == 'bybit':
+                order_df = CCXTRestApiParser.parse_fetch_order_bybit(order)
+            elif ex_name == 'okx':
+                order_df = CCXTRestApiParser.parse_fetch_order_okx(order)
+            if len(order_df) > 0:
+                self.__check_executions(order_df)
+                return order_df
+            else:
+                DisplayMessage.display_message('AccountUpdater','__check_execution_of_specific_order','error',
+                                               ['Order length is zero!',
+                                                ex_name +'-'+ symbol +'-'+ str(order_id),
+                                                order])
+                return None
+        else:
+            DisplayMessage.display_message('AccountUpdater','__check_execution_of_specific_order','error',
+                                               ['Order not found!',
+                                                ex_name +'-'+ symbol +'-'+ str(order_id),
+                                                order])
+            return None
+
 
 
     async def __update_free_cash(self):

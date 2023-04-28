@@ -257,7 +257,7 @@ class AccountData:
     @classmethod
     def get_total_cash(cls):
         with cls.lock:
-            return cls.total_cash
+            return round(cls.total_cash, 2)
         
     @classmethod
     def set_total_cash(cls, cash):
@@ -287,7 +287,7 @@ class AccountData:
     @classmethod
     def get_total_realized_pnl(cls):
         with cls.lock:
-            return cls.total_realized_pnl
+            return round(cls.total_realized_pnl,2)
 
     @classmethod
     def set_total_realized_pnl(cls, value):
@@ -297,7 +297,7 @@ class AccountData:
     @classmethod
     def get_total_unrealized_pnl(cls):
         with cls.lock:
-            return cls.total_unrealized_pnl
+            return round(cls.total_unrealized_pnl,2)
 
     @classmethod
     def set_total_unrealized_pnl(cls, value):
@@ -309,9 +309,9 @@ class AccountData:
         with cls.lock:
             key = ex_name+'-'+base+'/'+quote
             if key in cls.total_fees:
-                return cls.total_fees[ex_name+'-'+base+'/'+quote]
+                return round(cls.total_fees[ex_name+'-'+base+'/'+quote],4)
             else:
-                return None
+                return 0.0
 
     @classmethod
     def set_total_fees(cls, ex_name, base, quote, fee):
@@ -322,7 +322,7 @@ class AccountData:
     @classmethod
     def get_total_fee(cls):
         with cls.lock:
-            return cls.total_fee
+            return round(cls.total_fee,4)
 
     '''
     @classmethod
@@ -346,9 +346,9 @@ class AccountData:
         with cls.lock:
             key = ex_name+'-'+base+'/'+quote
             if key in cls.realized_pnls:
-                return cls.realized_pnls[ex_name+'-'+base+'/'+quote]
+                return round(cls.realized_pnls[ex_name+'-'+base+'/'+quote], 3)
             else:
-                return None
+                return 0.0
     
     @classmethod
     def set_realized_pnls(cls, ex_name, base, quote, pnl):
@@ -373,7 +373,7 @@ class AccountData:
     @classmethod
     def get_total_pnl(cls):
         with cls.lock:
-            return cls.total_pnl
+            return round(cls.total_pnl,2)
 
     
     @classmethod
@@ -383,6 +383,7 @@ class AccountData:
             long_holdings = holding_df[holding_df['side'] == 'long'].copy()
             short_holdings = holding_df[holding_df['side'] == 'short'].copy()
             long_holdings['amount'] = long_holdings['qty'] * long_holdings['price']
+            short_holdings['qty'] = short_holdings['qty'].abs()  # Convert 'qty' to its absolute value
             short_holdings['amount'] = short_holdings['qty'] * short_holdings['price']
         long_total = long_holdings['amount'].sum()
         short_total = short_holdings['amount'].sum()

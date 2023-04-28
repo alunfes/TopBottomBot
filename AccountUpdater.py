@@ -213,8 +213,8 @@ class AccountUpdater:
                 else:
                     return additional_fee * price
 
-        def __calc_realized_pnl(ex_name, symbol, additional_exec_qty, avg_exec_price, matched_holding_df):
-            current_pnl = AccountData.get_realized_pnls(ex_name, symbol)
+        def __calc_realized_pnl(ex_name, base, quote, additional_exec_qty, avg_exec_price, matched_holding_df):
+            current_pnl = AccountData.get_realized_pnls(ex_name, base, quote)
             additional_pnl = additional_exec_qty * (avg_exec_price - matched_holding_df['price'].iloc[0]) if matched_holding_df['side'] == 'long' else additional_exec_qty * (matched_holding_df['price'].iloc[0] - avg_exec_price)
             if current_pnl is not None:
                 return current_pnl + additional_pnl
@@ -272,7 +272,7 @@ class AccountUpdater:
         def __process_partial_exit_execution(matched_api_order_dict, matched_holding_df, additional_exec_qty):
             #print('Patial exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
             DisplayMessage.display_message('AccountUpdater', '__process_partial_exit_execution', 'message', ['Patial exit execution: '+ matched_api_order_dict['ex_name']+ ':'+ matched_api_order_dict['symbol']+ '-'+ matched_api_order_dict['side']+ ' x '+ str(matched_api_order_dict['executed_qty'])+ ' @ '+ str(matched_api_order_dict['avg_price'])])
-            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['symbol'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
+            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0],matched_holding_df['quote_asset'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
             AccountData.set_realized_pnls(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], realized_pnl)
             AccountData.update_holding(
                 ex_name = matched_holding_df['ex_name'].iloc[0],

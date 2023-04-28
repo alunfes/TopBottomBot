@@ -1,5 +1,6 @@
 import pandas as pd
 import threading
+from itertools import zip_longest
 
 
 class AccountData:
@@ -329,7 +330,7 @@ class AccountData:
         with cls.lock:
             cls.total_fee = value
     '''
-    
+
     @classmethod
     def get_total_pnl_log(cls):
         with cls.lock:
@@ -374,7 +375,54 @@ class AccountData:
         with cls.lock:
             return cls.total_pnl
 
+    
+    @classmethod
+    def display_balance_sheet(cls):
+        holding_df = cls.get_holding_df()
+        with cls.lock:
+            long_holdings = holding_df[holding_df['side'] == 'long'].copy()
+            short_holdings = holding_df[holding_df['side'] == 'short'].copy()
+            long_holdings['amount'] = long_holdings['qty'] * long_holdings['price']
+            short_holdings['amount'] = short_holdings['qty'] * short_holdings['price']
+        long_total = long_holdings['amount'].sum()
+        short_total = short_holdings['amount'].sum()
+        ratio = long_total / short_total if short_total != 0 else 'N/A'
+
+        long_df = long_holdings[['ex_name', 'symbol', 'amount']]
+        short_df = short_holdings[['ex_name', 'symbol', 'amount']]
+        print("==============Long=====================")
+        print(long_df)
+        print("==============Short====================")
+        print(short_df)
+        print("=======================================")
+        print(f"Long/Short ratio = {ratio} (Long={long_total}, Short={short_total})")
+        print("=======================================")
         
+    
+    
+    @classmethod
+    def display_balance_sheet2(cls):
+        holding_df = cls.get_holding_df()
+        with cls.lock:
+            long_holdings = holding_df[holding_df['side'] == 'long'].copy() # Add .copy() here
+            short_holdings = holding_df[holding_df['side'] == 'short'].copy() # Add .copy() here
+            long_holdings['amount'] = long_holdings['qty'] * long_holdings['price']
+            short_holdings['amount'] = short_holdings['qty'] * short_holdings['price']
+        long_total = long_holdings['amount'].sum()
+        short_total = short_holdings['amount'].sum()
+        balance_sheet = pd.concat([long_holdings, short_holdings], axis=1, keys=['Long', 'Short'])
+        balance_sheet.columns.names = ['Position', 'Attribute']
+        print("Balance Sheet")
+        print("=======================================")
+        if len(balance_sheet) > 0:
+            print(balance_sheet)
+        else:
+            print('No position')
+        print("=======================================")
+        print(f"Total Long Amount: {long_total}")
+        print(f"Total Short Amount: {short_total}")
+        print("=======================================")
+
 
 
 

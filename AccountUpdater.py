@@ -83,6 +83,7 @@ class AccountUpdater:
             print('total fee=', AccountData.get_total_fee())
             print('num trade=', AccountData.get_num_trade())
             print('num win=', AccountData.get_num_win())
+            AccountData.display_balance_sheet()
             print('********************************************')
             CommunicationData.add_message('update', 'AccountUpdater', 'start_update', 'total pnl='+str(AccountData.get_total_pnl()))
             num_account_loop += 1
@@ -343,7 +344,7 @@ class AccountUpdater:
             if __check_order_matching(matched_api_order_df, account_order):
                 if account_order['type'] == 'limit':
                     if __check_exec_qty_validation(matched_api_order_df, account_order) > 0: #約定あり
-                        matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[0]
+                        matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[-1]
                         additional_exec_qty = matched_api_order_dict['executed_qty'] -  account_order['executed_qty']
                         holding_data_df = AccountData.get_holding_df()
                         matched_holding_data_df = pd.DataFrame()
@@ -351,14 +352,15 @@ class AccountUpdater:
                             matched_holding_data_df = holding_data_df[(holding_data_df['ex_name']==matched_api_order_dict['ex_name']) & (holding_data_df['base_asset']==matched_api_order_dict['base_asset']) & (holding_data_df['quote_asset']==matched_api_order_dict['quote_asset'])]
                         new_fee = __calc_fee(matched_api_order_dict['ex_name'], matched_api_order_dict['base_asset'], matched_api_order_dict['quote_asset'], matched_api_order_dict['fee'], matched_api_order_dict['fee_currency'], matched_api_order_df['price'])
                         AccountData.set_total_fees(matched_api_order_dict['ex_name'], matched_api_order_dict['base_asset'], matched_api_order_dict['quote_asset'], new_fee)
+                        order_side = {'buy':'long', 'sell':'short'}[matched_api_order_dict['side']] #to convert buy/sell to long/short to compare with holding side
                         if len(matched_holding_data_df) == 0: #new execution
                             __process_new_execution(matched_api_order_dict)
-                        elif len(matched_holding_data_df) == 1 and matched_api_order_dict['side'] == account_order['side']: #additional execution
+                        elif len(matched_holding_data_df) == 1 and order_side == matched_holding_data_df['side'].iloc[-1]: #additional execution
                             __process_additional_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
-                        elif len(matched_holding_data_df) == 1 and matched_api_order_dict['side'] != account_order['side']: #opposite execution
-                            if matched_holding_data_df['qty'] > matched_api_order_dict['executed_qty']: #partial exit
+                        elif len(matched_holding_data_df) == 1 and order_side != matched_holding_data_df['side'].iloc[-1]: #opposite execution
+                            if matched_holding_data_df['qty'].iloc[-1] > matched_api_order_dict['executed_qty']: #partial exit
                                 __process_partial_exit_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
-                            elif matched_holding_data_df['qty'] == matched_api_order_dict['executed_qty']: #full exit
+                            elif matched_holding_data_df['qty'].iloc[-1] == matched_api_order_dict['executed_qty']: #full exit
                                 __process_full_exit_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
                             else: #exit and opposite entry
                                 print('Exit and opposite entry is not intended action !')

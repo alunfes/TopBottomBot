@@ -124,7 +124,7 @@ class TestMain:
         for index, order in order_df.iterrows():
             ad.add_action(action='cancel', order_id=order['id'], ex_name=order['ex_name'], symbol=order['symbol'], base_asset=order['base_asset'], quote_asset=order['quote_asset'], order_type='', price=0, qty=0)
         for index, holding in holding_df.iterrows():
-            ad.add_action(action='buy' if holding['side']=='sell' else 'sell', order_id='', ex_name=holding['ex_name'], symbol=holding['symbol'], base_asset=holding['base_asset'], quote_asset=holding['quote_asset'], order_type='limit', price=0, qty=holding['qty'])
+            ad.add_action(action='buy' if holding['side']=='short' else 'sell', order_id='', ex_name=holding['ex_name'], symbol=holding['symbol'], base_asset=holding['base_asset'], quote_asset=holding['quote_asset'], order_type='limit', price=0, qty=holding['qty'])
         return ad.get_action()
 
     async def bot(self):
@@ -173,9 +173,9 @@ class TestMain:
             holding = AccountData.get_holding_df()
             order = AccountData.get_order_df()
             print('Holding:')
-            print(holding)
+            print(holding[['ex_name', 'symbol', 'side', 'price', 'qty', 'unrealized_pnl_usd']])
             print('Order:')
-            print(order)
+            print(order[['ex_name', 'symbol', 'side', 'avg_price', 'original_qty']])
             await asyncio.sleep(60)
         actions = self.__generate_test_exit_action_data()
         print('--------------------------------------------')
@@ -225,9 +225,9 @@ class TestMain:
             holding = AccountData.get_holding_df()
             order = AccountData.get_order_df()
             print('Holding:')
-            print(holding)
+            print(holding[['ex_name', 'symbol', 'side', 'price', 'qty', 'unrealized_pnl_usd']])
             print('Order:')
-            print(order)
+            print(order[['ex_name', 'symbol', 'side', 'avg_price', 'original_qty']])
             await asyncio.sleep(60)
 
 

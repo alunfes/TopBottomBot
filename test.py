@@ -100,21 +100,23 @@ class TestMain:
         Settings.initialize()
         TargetSymbolsData.initialize()
         self.crp = CCXTRestApi()
-        tsdi = TargetSymbolsDataInjector(self.crp, 1000000.0)
+        self.crp.initialize()
+
+        #tsdi = TargetSymbolsDataInjector(self.crp, 1000000.0)
         #tsdi.inject_target_data()
         #tsdi.inject_ohlcv_data(14)
-        tsdi.read_target_tickers()
-        tsdi.read_all_ohlcv()
+        #tsdi.read_target_tickers()
+        #tsdi.read_all_ohlcv()
     
     '''
     botでorder出す時は、ex_name, base assetが一致するtarget_dfのデータのsymbolを使うべき
     '''
     def __generate_test_action_data(self):
         ad = ActionData()
-        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', base_asset='GTC', quote_asset='USDT', order_type='limit', price=0, qty=5)
-        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', base_asset='CERL', quote_asset='USDT',order_type='limit', price=0, qty=230)
-        ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', base_asset='CSPR', quote_asset='USDT',order_type='limit', price=0, qty=90)
-        ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', base_asset='CORE', quote_asset='USDT',order_type='limit', price=0, qty=2)
+        ad.add_action(action='buy', order_id='', ex_name='binance', symbol='GTCUSDT', base_asset='GTC', quote_asset='USDT', order_type='market', price=0, qty=5)
+        #ad.add_action(action='buy', order_id='', ex_name='binance', symbol='CELRUSDT', base_asset='CERL', quote_asset='USDT',order_type='limit', price=0, qty=230)
+        #ad.add_action(action='sell', order_id='', ex_name='okx', symbol='CSPR-USDT-SWAP', base_asset='CSPR', quote_asset='USDT',order_type='limit', price=0, qty=90)
+        #ad.add_action(action='sell', order_id='', ex_name='bybit', symbol='COREUSDT', base_asset='CORE', quote_asset='USDT',order_type='limit', price=0, qty=2)
         return ad.get_action()
 
     def __generate_test_exit_action_data(self):
@@ -129,107 +131,33 @@ class TestMain:
 
     async def bot(self):
         actions = self.__generate_test_action_data()
-        for action in actions:
+        strategy = Strategy(self.crp)
+        pt_ratio = 0.01
+        lc_ratio = -0.01
+        action_data = await strategy.get_actions(pt_ratio, lc_ratio)
+        for action in action_data.actions:
             if action['action'] == 'buy' or action['action'] == 'sell':
-                if action['price'] > 0:
-                    pass
-                else: #set limit price for bid/ask
-                    price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
-                    res = await self.crp.send_order(
+                res = await self.crp.send_order(
                         ex_name=action['ex_name'],
                         symbol=action['symbol'],
                         order_type=action['order_type'],
                         side=action['action'],
-                        price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
-                        amount=float(action['qty'])
-                    )
-                    AccountData.add_order(
-                        ex_name=action['ex_name'],
-                        id=res['orderId'],
-                        symbol=action['symbol'],
-                        base=action['base_asset'],
-                        quote=action['quote_asset'],
-                        side=action['action'],
-                        type=action['order_type'],
                         price=action['price'],
-                        avg_price=action['price'],
-                        status=str(res['status']).lower(),
-                        original_qty=float(action['qty']),
-                        executed_qty=0.0,
-                        fee=0.0,
-                        fee_currency='',
-                        timestamp=time.time()
+                        amount=action['qty']
                     )
             elif action['action'] == 'cancel':
-                #cancelはaccount updater側で把握することにしている。
                 res = await self.crp.cancel_order(
-                    action['ex_name'],
-                    action['symbol'],
-                    action['order_id']
-                    )
-            else:
-                pass #do nothing
-        for i in range(10):
-            holding = AccountData.get_holding_df()
-            order = AccountData.get_order_df()
-            print('Holding:')
-            print(holding[['ex_name', 'symbol', 'side', 'price', 'qty', 'unrealized_pnl_usd']])
-            print('Order:')
-            print(order[['ex_name', 'symbol', 'side', 'avg_price', 'original_qty']])
-            await asyncio.sleep(60)
-        actions = self.__generate_test_exit_action_data()
-        print('--------------------------------------------')
-        print('Exit Mode')
-        print('--------------------------------------------')
-        for action in actions:
-            if action['action'] == 'buy' or action['action'] == 'sell':
-                if action['price'] > 0:
-                    pass
-                else: #set limit price for bid/ask
-                    price = await self.crp.fetch_target_price(action['ex_name'], action['symbol'])
-                    res = await self.crp.send_order(
-                        ex_name=action['ex_name'],
-                        symbol=action['symbol'],
-                        order_type=action['order_type'],
-                        side=action['action'],
-                        price=float(price['bid'].iloc[0]) if action['action'] == 'buy' else float(price['ask'].iloc[0]),
-                        amount=float(action['qty'])
-                    )
-                    AccountData.add_order(
-                        ex_name=action['ex_name'],
-                        id=res['orderId'],
-                        symbol=action['symbol'],
-                        base=action['base_asset'],
-                        quote=action['quote_asset'],
-                        side=action['action'],
-                        type=action['order_type'],
-                        price=action['price'],
-                        avg_price=action['price'],
-                        status=str(res['status']).lower(),
-                        original_qty=float(action['qty']),
-                        executed_qty=0.0,
-                        fee=0.0,
-                        fee_currency='',
-                        timestamp=time.time()
-                    )
-            elif action['action'] == 'cancel':
-                #cancelはaccount updater側で把握することにしている。
-                res = await self.crp.cancel_order(
-                    action['ex_name'],
-                    action['symbol'],
-                    action['order_id']
-                    )
-            else:
-                pass #do nothing
-        for i in range(10): #do exit
-            holding = AccountData.get_holding_df()
-            order = AccountData.get_order_df()
-            print('Holding:')
-            print(holding[['ex_name', 'symbol', 'side', 'price', 'qty', 'unrealized_pnl_usd']])
-            print('Order:')
-            print(order[['ex_name', 'symbol', 'side', 'avg_price', 'original_qty']])
-            await asyncio.sleep(60)
-
+                    ex_name=action['ex_name'],
+                    symbol=action['symbol'],
+                    order_id=action['id'],
+                )
+        holding = AccountData.get_holding_df()
+        order = AccountData.get_order_df()
+        print('Holding:')
+        print(holding[['ex_name', 'symbol', 'side', 'price', 'qty', 'unrealized_pnl_usd']])
+        print('Order:')
+        print(order[['ex_name', 'symbol', 'side', 'avg_price', 'original_qty']])
+        await asyncio.sleep(60)
 
 
     async def main(self):
@@ -238,8 +166,8 @@ class TestMain:
         communication = Communication()
         await asyncio.gather(
             account.start_update(),
+            self.bot(),
             communication.main_loop(),
-            self.bot()
         )
 
 

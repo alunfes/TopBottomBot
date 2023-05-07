@@ -75,6 +75,7 @@ class AccountUpdater:
             self.__sync_order_data(api_orders_df)
             self.__update_unrealized_pnl()
             self.__update_total_pnl()
+            self.__update_total_amount()
             print('********************************************')
             print('Account #',num_account_loop)
             print('total pnl=', AccountData.get_total_pnl())
@@ -188,11 +189,11 @@ class AccountUpdater:
 
 
         def __check_exec_qty_validation(matched_api_order_df, account_order_df):
-            if matched_api_order_df['executed_qty'].iloc[0] > account_order_df['executed_qty']:
-                return matched_api_order_df['executed_qty'].iloc[0] - account_order_df['executed_qty']
-            elif matched_api_order_df['executed_qty'].iloc[0] == account_order_df['executed_qty']:
+            if matched_api_order_df['executed_qty'].iloc[-1] > account_order_df['executed_qty']:
+                return matched_api_order_df['executed_qty'].iloc[-1] - account_order_df['executed_qty']
+            elif matched_api_order_df['executed_qty'].iloc[-1] == account_order_df['executed_qty']:
                 return 0
-            elif matched_api_order_df['executed_qty'].iloc[0] < account_order_df['executed_qty']:
+            elif matched_api_order_df['executed_qty'].iloc[-1] < account_order_df['executed_qty']:
                 DisplayMessage('AccountUpdater','__check_exec_qty_validation',['Executed_qty was decreased in '+ account_order_df['id']+ '!',
                                                                                'matched_df:',
                                                                                matched_api_order_df,
@@ -215,7 +216,7 @@ class AccountUpdater:
 
         def __calc_realized_pnl(ex_name, base, quote, additional_exec_qty, avg_exec_price, matched_holding_df):
             current_pnl = AccountData.get_realized_pnls(ex_name, base, quote)
-            additional_pnl = additional_exec_qty * (avg_exec_price - matched_holding_df['price'].iloc[0]) if matched_holding_df['side'] == 'long' else additional_exec_qty * (matched_holding_df['price'].iloc[0] - avg_exec_price)
+            additional_pnl = additional_exec_qty * (avg_exec_price - matched_holding_df['price'].iloc[-1]) if matched_holding_df['side'].iloc[-1] == 'long' else additional_exec_qty * (matched_holding_df['price'].iloc[-1] - avg_exec_price)
             if current_pnl is not None:
                 return current_pnl + additional_pnl
             else:
@@ -292,7 +293,7 @@ class AccountUpdater:
         def __process_full_exit_execution(matched_api_order_dict, matched_holding_df, additional_exec_qty):
             #print('Full exit execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
             DisplayMessage.display_message('AccountUpdater', '__process_full_exit_execution', 'message', ['Full exit execution: '+ matched_api_order_dict['ex_name']+ ':'+ matched_api_order_dict['symbol']+ '-'+ matched_api_order_dict['side']+ ' x '+ str(matched_api_order_dict['executed_qty'])+ ' @ '+ str(matched_api_order_dict['avg_price'])])
-            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['symbol'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
+            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0],matched_holding_df['quote_asset'].iloc[0], additional_exec_qty, matched_api_order_dict['avg_price'], matched_holding_df)
             AccountData.set_realized_pnls(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], realized_pnl)
             AccountData.remove_holding(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0])
             if realized_pnl > 0:
@@ -310,7 +311,7 @@ class AccountUpdater:
 
         def __process_exit_and_opposite_entry(matched_api_order_dict, matched_holding_df):
             print('Exit and opposite entry execution: ', matched_api_order_dict['ex_name'], ':', matched_api_order_dict['symbol'], '-', matched_api_order_dict['side'], ' x ', matched_api_order_dict['executed_qty'], ' @ ', matched_api_order_dict['avg_price'], )
-            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['symbol'].iloc[0], matched_holding_df['qty'].iloc[0], matched_api_order_dict['avg_price'], matched_holding_df)
+            realized_pnl = __calc_realized_pnl(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], matched_holding_df['qty'].iloc[0], matched_api_order_dict['avg_price'], matched_holding_df)
             AccountData.set_realized_pnls(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0], realized_pnl)
             new_holding_qty = matched_api_order_dict['executed_qty'] - matched_holding_df['qty'].iloc[0]
             AccountData.remove_holding(matched_holding_df['ex_name'].iloc[0], matched_holding_df['base_asset'].iloc[0], matched_holding_df['quote_asset'].iloc[0])
@@ -381,7 +382,8 @@ class AccountUpdater:
                     while True:
                         time.sleep(1)
                         if __check_exec_qty_validation(matched_api_order_df, account_order) > 0: #約定あり
-                            matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[0]
+                            matched_api_order_dict = matched_api_order_df.to_dict(orient='records')[-1]
+                            order_side = {'buy':'long', 'sell':'short'}[matched_api_order_dict['side']] #to convert buy/sell to long/short to compare with holding side
                             additional_exec_qty = matched_api_order_dict['executed_qty'] -  account_order['executed_qty']
                             holding_data_df = AccountData.get_holding_df()
                             matched_holding_data_df = pd.DataFrame()
@@ -391,12 +393,12 @@ class AccountUpdater:
                             AccountData.set_total_fees(matched_api_order_dict['ex_name'], matched_api_order_dict['base_asset'], matched_api_order_dict['quote_asset'], new_fee)
                             if len(matched_holding_data_df) == 0: #new execution
                                 __process_new_execution(matched_api_order_dict)
-                            elif len(matched_holding_data_df) == 1 and matched_api_order_dict['side'] == account_order['side']: #additional execution
+                            elif len(matched_holding_data_df) == 1 and order_side == matched_holding_data_df['side'].iloc[-1]: #additional execution
                                 __process_additional_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
-                            elif len(matched_holding_data_df) == 1 and matched_api_order_dict['side'] != account_order['side']: #opposite execution
-                                if matched_holding_data_df['qty'] > matched_api_order_dict['executed_qty']: #partial exit
+                            elif len(matched_holding_data_df) == 1 and order_side != matched_holding_data_df['side'].iloc[-1]: #opposite execution
+                                if matched_holding_data_df['qty'].iloc[-1] > matched_api_order_dict['executed_qty']: #partial exit
                                     __process_partial_exit_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
-                                elif matched_holding_data_df['qty'] == matched_api_order_dict['executed_qty']: #full exit
+                                elif matched_holding_data_df['qty'].iloc[-1] == matched_api_order_dict['executed_qty']: #full exit
                                     __process_full_exit_execution(matched_api_order_dict, matched_holding_data_df, additional_exec_qty)
                                 else: #exit and opposite entry
                                     print('Exit and opposite entry is not intended action !')
@@ -444,7 +446,7 @@ class AccountUpdater:
                     base_asset=matched_position_df['base_asset'].iloc[0],
                     quote_asset=matched_position_df['quote_asset'].iloc[0],
                     price=float(matched_position_df['price'].iloc[0]),
-                    qty=float(matched_position_df['qty'].iloc[0]),
+                    qty=float(abs(matched_position_df['qty'].iloc[0])),
                     unrealized_pnl_usd=float(matched_position_df['unrealized_pnl_usd'].iloc[0]),
                     unrealized_pnl_ratio=float(matched_position_df['unrealized_pnl_ratio'].iloc[0]),
                     liquidation_price=float(matched_position_df['liquidation_price'].iloc[0]),
@@ -563,9 +565,14 @@ class AccountUpdater:
     def __update_total_pnl(self):
         total_pnl = AccountData.get_total_realized_pnl() + AccountData.get_total_unrealized_pnl() - AccountData.get_total_fee()
         AccountData.set_total_pnl(total_pnl)
-        AccountData.set_total_pnl_log(total_pnl)
+        AccountData.add_total_pnl_log(total_pnl)
 
-
+    def __update_total_amount(self):
+        holding_df = AccountData.get_holding_df()
+        amount = 0
+        if len(holding_df) > 0:
+            amount = holding_df['price'] * holding_df['qty'].abs()
+        AccountData.set_total_amount(amount)
 
         
 

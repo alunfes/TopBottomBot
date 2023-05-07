@@ -12,7 +12,8 @@ import pandas as pd
 import os
 import numpy as np
 import yaml
-
+import pprint
+import requests
 
 
 '''
@@ -34,13 +35,18 @@ class CCXTRestApi:
         self.exchanges = ['binance', 'bybit', 'okx']
         self.__read_api_key()
         self.ccxt_exchanges = {}
+        loop = asyncio.get_event_loop()
         for ex in self.exchanges:
             self.ccxt_exchanges[ex] = self.__get_exchanges(ex)
             if ex=='binance':
                 #self.ccxt_exchanges[ex].options = {'defaultType': 'linear', 'adjustForTimeDifference': True}
                 pass
         self.ex_num_downloads = {'okx':100, 'bybit':100, 'binance':500}
-        
+    
+    async def initialize(self):
+        for ex in self.exchanges:
+            await self.ccxt_exchanges[ex].load_markets()
+
 
     def __read_api_key(self):
         self.public_keys = {}
@@ -404,18 +410,39 @@ class CCXTRestApi:
             loop.run_until_complete(self.ccxt_exchanges[k].close())
         loop.close()
 
+    async def get_min_lot(self, symbol):
+        binance_exchange_info = requests.get('https://api.binance.com/api/v3/exchangeInfo').json()
+        for item in binance_exchange_info['symbols']:
+            if item['symbol'] == self.ccxt_exchanges['binance'].market_id(symbol):
+                for filter in item['filters']:
+                    if filter['filterType'] == 'LOT_SIZE':
+                        min_qty = float(filter['minQty'])
+                        print(f'Binance {symbol} 最低取引数量: {min_qty}')
+
+    def amount_to_precision(self, ex_name, symbol, amount):
+        res = self.ccxt_exchanges[ex_name].amount_to_precision(symbol, amount)
+        return float(res)
+    
+    async def fetch_order_book(self, ex_name, symbol):
+        '''
+        {'symbol': 'BLUR/USDT', 'bids': [[0.5231, 1455.0], [0.523, 805.0], [0.5229, 1703.0], [0.5228, 6475.0], [0.5227, 7417.0], [0.5226, 12844.0], [0.5225, 15952.0], [0.5224, 22410.0], [0.5223, 9373.0], [0.5222, 13583.0],
+        'asks': [[0.5232, 9300.0], [0.5233, 6755.0], [0.5234, 4223.0], [0.5235, 6535.0], [0.5236, 11651.0], [0.5237, 13971.0], [0.5238, 9875.0]]}
+        '''
+        res = await self.ccxt_exchanges[ex_name].fetchOrderBook(symbol)
+        return res
 
 
 
+#1000BONK/USDT
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     crp = CCXTRestApi()
-    #order = loop.run_until_complete(crp.send_order('binance', 'XRPUSDT', 'limit', 'buy', 0.45, 15))
+    loop.run_until_complete(crp.initialize())
+    #order = loop.run_until_complete(crp.send_order('binance', 'ALPHAUSDT', 'limit', 'buy', 0.1, 442.0))
     #print(order)
     #time.sleep(3)
-    #orders = loop.run_until_complete(crp.get_all_orders('bybit'))
     #df= CCXTRestApiParser.parse_get_all_orders_general('bybit',orders)
-    #print(df)
+    #pprint.pprint(orders.iloc[0])
     #res = asyncio.run(crp.fetch_positions('binance'))
     #df =CCXTRestApiParser.parse_fetch_position_binance(res)
     #sele = df[df['side'].notnull()]
@@ -423,12 +450,16 @@ if __name__ == '__main__':
     #df = pd.DataFrame(res)
     #print(df)
     #time.sleep(3)
-    res = loop.run_until_complete(crp.fetch_order(ex_name='binance', symbol='XRPUSDT', order_id='32945045423'))
+    #res = loop.run_until_complete(crp.fetch_order(ex_name='binance', symbol='XRPUSDT', order_id='32945045423'))
     #res = loop.run_until_complete(crp.get_trades('bybit'))
-    print(res)
-    #df = pd.json_normalize(orders['data'])
-    #res = asyncio.run(crp.ccxt_exchanges['binance'].fapiPrivateGetUserTrades())
     #print(res)
+    #df = pd.json_normalize(orders['data'])
+    #crp.ccxt_exchanges['binance'].load_markets()
+    #res = loop.run_until_complete(crp.fetch_target_price('binance','BLUR/USDT'))
+    res = loop.run_until_complete(crp.ccxt_exchanges['binance'].fetchOrderBook('BLUR/USDT'))
+    print(res)
+    #df = pd.DataFrame(res).transpose()
+    #pprint.pprint(df[df['symbol']=='ALPHA/USDT'].iloc[0]['limits'])
     #df.to_csv('./Data/okx_trades.csv', index=False)
     #pd.DataFrame(res['assets']).to_csv('./bina_asset.csv')
     #pd.DataFrame(res['positions']).to_csv('./bina_posi.csv')
@@ -437,7 +468,7 @@ if __name__ == '__main__':
     #l = list(dir(crp.ccxt_exchanges['okx']))
     #pd.DataFrame(l).to_csv('./funcs.csv')
     #order = asyncio.run(crp.fetch_trade('binance', 'TRX/USDT:USDT', '9446494975'))
-    #print(order)
+    
 
     #df.to_csv('./okx.csv')
    

@@ -8,6 +8,8 @@ class Settings:
         cls.after_kijun_period = 0
         cls.num_top_bottom_targets = 0
         cls.account_update_freq = 0
+        cls.target_24h_vol_kijun = 0
+        cls.min_order_amount = 0
         try:
             with open('./ignore/settings.yaml', 'r') as f:
                 data = yaml.load(f, Loader=yaml.Loader)
@@ -17,6 +19,7 @@ class Settings:
                 cls.num_top_bottom_targets = int(data['num_top_bottom_targets'])
                 cls.account_update_freq = int(data['account_update_freq'])
                 cls.target_24h_vol_kijun = float(data['target_24h_vol_kijun'])
+                cls.min_order_amount = float(data['min_order_amount'])
         except Exception as e:
             print('Settings.__read_setting.yaml: ', e)
             return None

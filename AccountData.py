@@ -46,6 +46,7 @@ class AccountData:
         #performance
         cls.num_trade = 0
         cls.num_win = 0
+        cls.total_amount = 0
         cls.total_pnl = 0
         cls.total_realized_pnl = 0
         cls.total_unrealized_pnl = 0
@@ -127,7 +128,7 @@ class AccountData:
             else:
                 cls.holding_side.append(side)
             cls.holding_price.append(price)
-            cls.holding_qty.append(qty)
+            cls.holding_qty.append(abs(qty))
             cls.holding_timestamp.append(timestamp)
             cls.holding_period.append(period)
             cls.holding_unrealized_pnl_usd.append(unrealized_pnl_usd)
@@ -161,8 +162,8 @@ class AccountData:
     @classmethod
     def remove_holding(cls, ex_name, base_asset, quote_asset):
         with cls.lock:
-            base_indices = [i for i in range(len(cls.holding_base_asset)) if (cls.holding_base_asset[i] == base_asset and cls.holding_ex_name==ex_name)]
-            quote_indices = [i for i in range(len(cls.holding_quote_asset)) if (cls.holding_quote_asset[i] == quote_asset and cls.holding_ex_name==ex_name)]
+            base_indices = [i for i in range(len(cls.holding_base_asset)) if (cls.holding_base_asset[i] == base_asset and cls.holding_ex_name[i] == ex_name)]
+            quote_indices = [i for i in range(len(cls.holding_quote_asset)) if (cls.holding_quote_asset[i] == quote_asset and cls.holding_ex_name[i] == ex_name)]
             common_values = [value for value in base_indices if value in quote_indices]
             if len(common_values) == 1:
                 idx = common_values[0]
@@ -226,7 +227,7 @@ class AccountData:
                 if price is not None:
                     cls.holding_price[idx] = price
                 if qty is not None:
-                    cls.holding_qty[idx] = qty
+                    cls.holding_qty[idx] = abs(qty)
                 if timestamp is not None:
                     cls.holding_timestamp[idx] = timestamp
                 if period is not None:
@@ -337,9 +338,9 @@ class AccountData:
             return cls.total_pnl_log
 
     @classmethod
-    def set_total_pnl_log(cls, value):
+    def add_total_pnl_log(cls, value):
         with cls.lock:
-            cls.total_pnl_log = value
+            cls.total_pnl_log.append(value)
     
     @classmethod
     def get_realized_pnls(cls, ex_name, base, quote):
@@ -374,6 +375,18 @@ class AccountData:
     def get_total_pnl(cls):
         with cls.lock:
             return round(cls.total_pnl,2)
+        
+    @classmethod
+    def set_total_amount(cls, amount):
+        with cls.lock:
+            cls.total_amount = amount
+    
+    @classmethod
+    def get_total_amount(cls):
+        with cls.lock:
+            return cls.total_amount
+
+
 
     
     @classmethod
@@ -399,30 +412,7 @@ class AccountData:
         print(f"Long/Short ratio = {ratio} (Long={long_total}, Short={short_total})")
         print("=======================================")
         
-    
-    
-    @classmethod
-    def display_balance_sheet2(cls):
-        holding_df = cls.get_holding_df()
-        with cls.lock:
-            long_holdings = holding_df[holding_df['side'] == 'long'].copy() # Add .copy() here
-            short_holdings = holding_df[holding_df['side'] == 'short'].copy() # Add .copy() here
-            long_holdings['amount'] = long_holdings['qty'] * long_holdings['price']
-            short_holdings['amount'] = short_holdings['qty'] * short_holdings['price']
-        long_total = long_holdings['amount'].sum()
-        short_total = short_holdings['amount'].sum()
-        balance_sheet = pd.concat([long_holdings, short_holdings], axis=1, keys=['Long', 'Short'])
-        balance_sheet.columns.names = ['Position', 'Attribute']
-        print("Balance Sheet")
-        print("=======================================")
-        if len(balance_sheet) > 0:
-            print(balance_sheet)
-        else:
-            print('No position')
-        print("=======================================")
-        print(f"Total Long Amount: {long_total}")
-        print(f"Total Short Amount: {short_total}")
-        print("=======================================")
+
 
 
 

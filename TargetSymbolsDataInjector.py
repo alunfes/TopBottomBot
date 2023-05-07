@@ -8,7 +8,6 @@ import time
 import math
 
 
-
 class TargetSymbolsDataInjector:
     def __init__(self, ccxt_api:CCXTRestApi, vol_kijun_24h:float):
         TargetSymbolsData.initialize()
@@ -17,7 +16,7 @@ class TargetSymbolsDataInjector:
         self.crp =ccxt_api
     
 
-    def inject_ohlcv_data(self, data_days:int):
+    async def inject_ohlcv_data(self, data_days:int):
         print('Downloading 4h ohlc...')
         ohlc_min = 240
         since = (int(time.time()) - 60 * 1440 * data_days) * 1000
@@ -37,7 +36,7 @@ class TargetSymbolsDataInjector:
         all_download_done = 0
         while True:
             target = ex_symbol_pairs[i:i+num_cycle_downloads]
-            self.loop.run_until_complete(self.crp.get_multiple_ohlc(target, ohlc_min, since))
+            await self.crp.get_multiple_ohlc(target, ohlc_min, since)
             all_download_done += 1
             if i + num_cycle_downloads > len(ex_symbol_pairs):
                 break
@@ -91,16 +90,19 @@ class TargetSymbolsDataInjector:
         
 
 
-    def inject_target_data(self):
+    async def inject_target_data(self):
         print('Generating target ticker list...')
         df_ticker = []
         for ex in Settings.exchanges:
             if ex == 'binance':
-                df_ticker.append(self.__get_binance_target())
+                res = await self.__get_binance_target()
+                df_ticker.append(res)
             elif ex == 'bybit':
-                df_ticker.append(self.__get_bybit_target())
+                res = await self.__get_bybit_target()
+                df_ticker.append(res)
             elif ex == 'okx':
-                df_ticker.append(self.__get_okx_target())
+                res = await self.__get_okx_target()
+                df_ticker.append(res)
         target_df = pd.concat(df_ticker, axis=0).reset_index(drop=True)
         target_df = self.__remove_duplication(target_df)
         target_df.to_csv('./Data/target_df.csv', index=False)
@@ -131,9 +133,9 @@ class TargetSymbolsDataInjector:
 
 
 
-    def __get_binance_target(self):
-        tickers = self.loop.run_until_complete(self.crp.get_tickers('binance'))
-        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_binance())
+    async def __get_binance_target(self):
+        tickers = await self.crp.get_tickers('binance')
+        ticker_vols = await self.crp.get_tickers_24h_binance()
         #ticker_vols.to_csv('./binance_vol.csv')
         target = []
         sell_ok = []
@@ -164,9 +166,9 @@ class TargetSymbolsDataInjector:
         return tickers
 
 
-    def __get_bybit_target(self):
-        tickers = self.loop.run_until_complete(self.crp.get_tickers('bybit'))
-        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_bybit())
+    async def __get_bybit_target(self):
+        tickers = await self.crp.get_tickers('bybit')
+        ticker_vols = await self.crp.get_tickers_24h_bybit()
         #ticker_vols.to_csv('./bybit_vol.csv')
         target = []
         sell_ok = []
@@ -196,9 +198,9 @@ class TargetSymbolsDataInjector:
         return tickers
 
 
-    def __get_okx_target(self):
-        tickers = self.loop.run_until_complete(self.crp.get_tickers('okx'))
-        ticker_vols = self.loop.run_until_complete(self.crp.get_tickers_24h_okx())
+    async def __get_okx_target(self):
+        tickers = await self.crp.get_tickers('okx')
+        ticker_vols = await self.crp.get_tickers_24h_okx()
         #ticker_vols.to_csv('./okx_vol.csv')
         target = []
         sell_ok = []

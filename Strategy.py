@@ -165,16 +165,22 @@ class Strategy:
     
 
     async def calc_lot(self):
-        def round_lot(ex_name, symbol, lot, price):
+        async def round_lot(ex_name, symbol, lot, price):
             '''
-            min_order_amount以上かつamount_to_precisionでlotを算出して
+            min_order_amount以上かつamount_to_precisionでlotを算出して、その後実際のbidsに小数点以下のamountあるか確認してない場合は四捨五入してintにする
             '''
             if lot * price < Settings.min_order_amount: #amount should be larger than minimul amount
                 lot = Settings.min_order_amount / price
             precision = self.crp.amount_to_precision(ex_name, symbol, lot)
+            book = await self.crp.fetch_order_book(ex_name, symbol)
+            decimal_numbers = [bid[1] for bid in book['bids'] if isinstance(bid[1], float) and not bid[1].is_integer()]
             decimals = np.log10(precision).astype(int)
             new_lot = np.around(precision, decimals=2 - decimals)
             new_lot = int(new_lot) if new_lot.is_integer() else new_lot
+            if len(decimal_numbers) == 0:
+                new_lot = round(new_lot)
+            if 'TOMO' in symbol:
+                print('kita')
             return new_lot
 
         
@@ -201,7 +207,7 @@ class Strategy:
             top_prices.append(float(res['last'].iloc[0]))
             top_lot = self.test_qty_denominator * self.top_targets_df['allocation_amount'].iloc[i] / float(res['last'].iloc[0])
             symbol = self.top_targets_df['key'].iloc[i].split('-')[1] if self.top_targets_df['ex_name'].iloc[i] != 'okx' else self.top_targets_df['key'].iloc[i].split('-')[1].replace('USDT','')+'-USDT-SWAP'
-            rounded_lot = round_lot(self.top_targets_df['ex_name'].iloc[i], symbol, top_lot, float(res['last'].iloc[0]))
+            rounded_lot = await round_lot(self.top_targets_df['ex_name'].iloc[i], symbol, top_lot, float(res['last'].iloc[0]))
             top_lots.append(rounded_lot)
             print(symbol, ' : original_lot=', top_lot, ', rounded_lot=', rounded_lot, 'ratio=', top_lot / rounded_lot)
         self.top_targets_df['allocation_lot'] = top_lots
@@ -214,7 +220,7 @@ class Strategy:
             bottom_prices.append(float(res['last'].iloc[0]))
             bottom_lot = self.test_qty_denominator * self.bottom_targets_df['allocation_amount'].iloc[i] / float(res['last'].iloc[0]) 
             symbol = self.bottom_targets_df['key'].iloc[i].split('-')[1] if self.bottom_targets_df['ex_name'].iloc[i] != 'okx' else self.bottom_targets_df['key'].iloc[i].split('-')[1].replace('USDT','')+'-USDT-SWAP'
-            rounded_lot = round_lot(self.bottom_targets_df['ex_name'].iloc[i], symbol, bottom_lot, float(res['last'].iloc[0]))
+            rounded_lot = await round_lot(self.bottom_targets_df['ex_name'].iloc[i], symbol, bottom_lot, float(res['last'].iloc[0]))
             bottom_lots.append(rounded_lot)
             print(symbol, ' : original_lot=', bottom_lot, ', rounded_lot=', rounded_lot, 'ratio=', bottom_lot / rounded_lot)
         self.bottom_targets_df['allocation_lot'] = bottom_lots

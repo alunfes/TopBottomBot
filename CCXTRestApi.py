@@ -1,6 +1,6 @@
 from TargetSymbolsData import TargetSymbolsData
 from CommunicationData import CommunicationData
-from CCXTRestApiParser import CCXTRestApiParser
+from DisplayMessage import DisplayMessage
 
 import ccxt.async_support as ccxt
 import time
@@ -317,13 +317,18 @@ class CCXTRestApi:
         except ccxt.InsufficientFunds as e:
             # 残高不足の場合はエラーを出す
             print('Insufficient funds:', e)
+            
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
-            return None
+            return e
         except ccxt.InvalidOrder as e:
             # 注文が不正
             print('Invalid order:', e)
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
-            return None
+            return e
+        except Exception as e:
+            print('Invalid order2:', e)
+            CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
+            return e
 
 
     async def cancel_order(self, ex_name, symbol, order_id):
@@ -420,7 +425,8 @@ class CCXTRestApi:
                         print(f'Binance {symbol} 最低取引数量: {min_qty}')
 
     def amount_to_precision(self, ex_name, symbol, amount):
-        res = self.ccxt_exchanges[ex_name].amount_to_precision(symbol, amount)
+        #res = self.ccxt_exchanges[ex_name].amount_to_precision(symbol, amount)
+        res = self.ccxt_exchanges[ex_name].amountToPrecision(symbol, amount)
         return float(res)
     
     async def fetch_order_book(self, ex_name, symbol):
@@ -431,6 +437,14 @@ class CCXTRestApi:
         res = await self.ccxt_exchanges[ex_name].fetchOrderBook(symbol)
         return res
 
+
+    def get_market_from_symbols(self, ex_name, symbol):
+        '''
+        used to get lot precision
+        binance:{'id': 'WOOUSDT', 'symbol': 'WOO/USDT', 'base': 'WOO', 'quote': 'USDT', 'baseId': 'WOO', 'quoteId': 'USDT', 'active': True, 'type': 'spot', 'linear': None, 'inverse': None, 'spot': True, 'swap': False, 'future': True, 'option': False, 'margin': True, 'contract': False, 'contractSize': None, 'expiry': None, 'expiryDatetime': None, 'optionType': None, 'strike': None, 'settle': None, 'settleId': None, 'precision': {'amount': 1, 'price': 4, 'base': 8, 'quote': 8}, 'limits': {'amount': {'min': 0.1, 'max': 92141578.0}, 'price': {'min': 0.0001, 'max': 1000.0}, 'cost': {'min': None, 'max': None}, 'leverage': {'min': None, 'max': None}, 'market': {'min': 0.0, 'max': 1202411.84020833}}, 'info': {'symbol': 'WOOUSDT', 'status': 'TRADING', 'baseAsset': 'WOO', 'baseAssetPrecision': '8', 'quoteAsset': 'USDT', 'quotePrecision': '8', 'quoteAssetPrecision': '8', 'baseCommissionPrecision': '8', 'quoteCommissionPrecision': '8', 'orderTypes': ['LIMIT', 'LIMIT_MAKER', 'MARKET', 'STOP_LOSS_LIMIT', 'TAKE_PROFIT_LIMIT'], 'icebergAllowed': True, 'ocoAllowed': True, 'quoteOrderQtyMarketAllowed': True, 'allowTrailingStop': True, 'cancelReplaceAllowed': True, 'isSpotTradingAllowed': True, 'isMarginTradingAllowed': True, 'filters': [{'filterType': 'PRICE_FILTER', 'minPrice': '0.00010000', 'maxPrice': '1000.00000000', 'tickSize': '0.00010000'}, {'filterType': 'LOT_SIZE', 'minQty': '0.10000000', 'maxQty': '92141578.00000000', 'stepSize': '0.10000000'}, {'filterType': 'ICEBERG_PARTS', 'limit': '10'}, {'filterType': 'MARKET_LOT_SIZE', 'minQty': '0.00000000', 'maxQty': '1202411.84020833', 'stepSize': '0.00000000'}, {'filterType': 'TRAILING_DELTA', 'minTrailingAboveDelta': '10', 'maxTrailingAboveDelta': '2000', 'minTrailingBelowDelta': '10', 'maxTrailingBelowDelta': '2000'}, {'filterType': 'PERCENT_PRICE_BY_SIDE', 'bidMultiplierUp': '5', 'bidMultiplierDown': '0.2', 'askMultiplierUp': '5', 'askMultiplierDown': '0.2', 'avgPriceMins': '5'}, {'filterType': 'NOTIONAL', 'minNotional': '10.00000000', 'applyMinToMarket': True, 'maxNotional': '9000000.00000000', 'applyMaxToMarket': False, 'avgPriceMins': '5'}, {'filterType': 'MAX_NUM_ORDERS', 'maxNumOrders': '200'}, {'filterType': 'MAX_NUM_ALGO_ORDERS', 'maxNumAlgoOrders': '5'}], 'permissions': ['SPOT', 'MARGIN', 'TRD_GRP_005'], 'defaultSelfTradePreventionMode': 'NONE', 'allowedSelfTradePreventionModes': ['NONE', 'EXPIRE_TAKER', 'EXPIRE_MAKER', 'EXPIRE_BOTH']}, 'percentage': True, 'feeSide': 'get', 'tierBased': False, 'taker': 0.001, 'maker': 0.001, 'lowercaseId': 'woousdt'}
+        '''
+        res = self.ccxt_exchanges[ex_name].getMarketFromSymbols([symbol])
+        return res
 
 
 #1000BONK/USDT
@@ -454,9 +468,9 @@ if __name__ == '__main__':
     #res = loop.run_until_complete(crp.get_trades('bybit'))
     #print(res)
     #df = pd.json_normalize(orders['data'])
-    #crp.ccxt_exchanges['binance'].load_markets()
-    #res = loop.run_until_complete(crp.fetch_target_price('binance','BLUR/USDT'))
-    res = loop.run_until_complete(crp.ccxt_exchanges['binance'].fetchOrderBook('BLUR/USDT'))
+    res = crp.ccxt_exchanges['binance'].getMarketFromSymbols(['XTZ/USDT'])
+    #res = loop.run_until_complete(crp.fetch_order_book('binance','TOMO/USDT'))
+    #res = crp.amount_to_precision('binance', 'WOOUSDT', 74.5)
     print(res)
     #df = pd.DataFrame(res).transpose()
     #pprint.pprint(df[df['symbol']=='ALPHA/USDT'].iloc[0]['limits'])

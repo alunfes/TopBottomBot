@@ -52,8 +52,7 @@ class TargetSymbolsDataInjector:
             file_name = cex_df['ex_name'].iloc[i]+'-'+(cex_df['id'].iloc[i] if cex_df['ex_name'].iloc[i] != 'okx' else cex_df['symbol'].iloc[i].split(':')[0].replace('/',''))
             TargetSymbolsData.target_ohlcv_df[file_name] = pd.read_csv('./Data/ohlcv/'+file_name+'.csv')
         target_ohlcv_df = TargetSymbolsData.target_ohlcv_df.copy()
-        self.__check_dt(target_ohlcv_df)
-        TargetSymbolsData.target_ohlcv_df
+        TargetSymbolsData.target_ohlcv_df = self.__check_dt(target_ohlcv_df)
         print('Completed ohlcv download.')
 
     '''
@@ -71,22 +70,18 @@ class TargetSymbolsDataInjector:
         most_common_last_df = max(set(last_dt_list), key=last_dt_list.count)
         TargetSymbolsData.common_last_dt = most_common_last_df
         # dict内のDataFrameをループし、dt列を最も多いdtでフィルタリング
+        new_target_ohlcv_df = {}  # create a new dictionary to store the DataFrames that meet the conditions
         for key, df in target_ohlcv_df.items():
-            # dt列をpandas.Timestamp型に変換
             dtlist = pd.to_datetime(df['dt'])
             if dtlist.iloc[0] != most_common_first_df:
                 print('First dt in ', key, ' is not matched !', ': ',dtlist.iloc[0])
-                pass
+                continue  # skip this DataFrame
             if dtlist.iloc[-1] != most_common_last_df:
                 print('Last dt in ', key, ' is not matched !', ': ',dtlist.iloc[-1])
-                #remove all data after common dt
-            '''
-            num_deleted = len(df) - len(filtered_df)
-            print(f"{key}: {num_deleted} rows deleted")
-            # dict内のDataFrameを上書き
-            target_ohlcv_df[key] = filtered_df
-            '''
-        #return target_ohlcv_df
+                continue  # skip this DataFrame
+            # if the DataFrame meets the conditions, add it to the new dictionary
+            new_target_ohlcv_df[key] = df
+        return new_target_ohlcv_df
         
 
 
@@ -142,7 +137,7 @@ class TargetSymbolsDataInjector:
         vols = []
         #check sell_ok and target(fitler by vol)
         for index, row in tickers.iterrows():
-            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap' and row['contract'] == True:
+            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap' and row['contract'] == True and 'USD' not in row['baseId']:
                 sell_ok.append(True)
                 vol_data = ticker_vols[ticker_vols['symbol'] == row['id']]
                 vol = float(vol_data['weightedAvgPrice'].iloc[0]) * float(vol_data['volume'].iloc[0]) + float(vol_data['quoteVolume'].iloc[0])
@@ -174,7 +169,7 @@ class TargetSymbolsDataInjector:
         sell_ok = []
         vols = []
         for index, row in tickers.iterrows():
-            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap':
+            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap' and 'USD' not in row['baseId']:
                 sell_ok.append(True)
                 vol_data = ticker_vols[ticker_vols['symbol'] == row['id']]
                 vol = 0.5 * (float(vol_data['highPrice24h'].iloc[0]) + float(vol_data['lowPrice24h'].iloc[0])) * float(vol_data['volume24h'].iloc[0])
@@ -206,7 +201,7 @@ class TargetSymbolsDataInjector:
         sell_ok = []
         vols = []
         for index, row in tickers.iterrows():
-            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap':
+            if row['active'] == True and row['quoteId'] == 'USDT' and row['type'] == 'swap' and 'USD' not in row['baseId']:
                 sell_ok.append(True)
                 vol_data = ticker_vols[ticker_vols['symbol'] == row['symbol'].split(':')[0]]
                 vol = float(vol_data['baseVolume'].iloc[0]) * float(vol_data['vwap'].iloc[0])  + float(vol_data['quoteVolume'].iloc[0])

@@ -69,7 +69,7 @@ class Strategy:
                 symbol = bottom['key'].split('-')[-1] if bottom['ex_name'] != 'okx' else bottom['key'].split('-')[-1].replace('USDT','')+'-USDT-SWAP'
                 base = bottom['key'].split('-')[-1].replace('USDT','')
                 book = await self.crp.fetch_order_book(bottom['ex_name'], symbol)
-                ad.add_action(action='buy', order_id='', ex_name=top['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=float(book['bids'][0][0]), qty=bottom['allocation_lot'])
+                ad.add_action(action='buy', order_id='', ex_name=bottom['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=float(book['bids'][0][0]), qty=bottom['allocation_lot'])
             self.pf_status = 'Entry'
         elif self.pf_status == 'Entry' or self.pf_status == 'Hold': #entry in-progress or holding status
             pnl_ratio = 0.0 if AccountData.get_total_amount() > 0 else AccountData.get_total_pnl() / AccountData.get_total_amount()
@@ -179,8 +179,23 @@ class Strategy:
             new_lot = int(new_lot) if new_lot.is_integer() else new_lot
             if len(decimal_numbers) == 0:
                 new_lot = round(new_lot)
-            if 'TOMO' in symbol:
-                print('kita')
+            if ex_name == 'okx':
+                market = self.crp.get_market_from_symbols(ex_name, symbol)
+                new_lot = round(new_lot / float(market['contractSize']))
+            elif ex_name in 'binance':
+                '''
+                試しにorder出して-1111のエラーになったらlotを四捨五入等する。今はtomoだけで明示的なので使ってない。
+                order = await self.crp.send_order('binance', symbol, 'limit', 'buy', 0, new_lot)
+                if '1111' in str(order):
+                    new_lot = round(new_lot)
+                else:
+                    cancel = await self.crp.cancel_order(ex_name, symbol, order['orderId'])
+                    print(cancel)
+                '''
+                if new_lot > 1.0:
+                    new_lot = round(new_lot)
+                else:
+                    print('binance order size is less than 1.0 !')
             return new_lot
 
         

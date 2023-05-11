@@ -270,7 +270,7 @@ class CCXTRestApi:
 
         
 
-    async def send_order(self, ex_name, symbol, order_type:str, side:str, price=None, amount=None):
+    async def send_order(self, ex_name, symbol, order_type:str, side:str, price, amount):
         """
         指定されたsymbolに対して、指定されたorder_typeの注文を出し、約定情報を返す関数
 
@@ -297,7 +297,9 @@ class CCXTRestApi:
             amount = abs(amount) #sellの時はマイナス表示なのでqtyを参照して反対売買するときにエラーにならないように。
             order = None
             if order_type == 'limit':
-                # 価格と数量を指定して注文を出す
+                if price == 0: #limit orderでpriceが0の時は一番近いbid/askにorderを出す。
+                    book = await self.fetch_order_book(ex_name, symbol)
+                    price = float(book['bids'][0][0]) if side == 'buy' else float(book['asks'][0][0])
                 if ex_name=='binance':
                     order = await self.ccxt_exchanges[ex_name].fapiPrivatePostOrder({'symbol':symbol,'type':'LIMIT','side':side.upper(),'price':price,'quantity':amount, 'timeInForce':'GTC'})
                 else:
@@ -317,16 +319,33 @@ class CCXTRestApi:
         except ccxt.InsufficientFunds as e:
             # 残高不足の場合はエラーを出す
             print('Insufficient funds:', e)
-            
+            DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
+                                           [e,
+                                            ex_name + ':'+symbol,
+                                            'side='+side,
+                                            'price='+str(price),
+                                            'lot='+str(amount)])
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
             return e
         except ccxt.InvalidOrder as e:
             # 注文が不正
             print('Invalid order:', e)
+            DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
+                                           [e,
+                                            ex_name + ':'+symbol,
+                                            'side='+side,
+                                            'price='+str(price),
+                                            'lot='+str(amount)])
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
             return e
         except Exception as e:
             print('Invalid order2:', e)
+            DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
+                                           [e,
+                                            ex_name + ':'+symbol,
+                                            'side='+side,
+                                            'price='+str(price),
+                                            'lot='+str(amount)])
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
             return e
 
@@ -449,14 +468,16 @@ class CCXTRestApi:
 
 #1000BONK/USDT
 if __name__ == '__main__':
+    CommunicationData .initialize()
     loop = asyncio.get_event_loop()
     crp = CCXTRestApi()
     loop.run_until_complete(crp.initialize())
     #order = loop.run_until_complete(crp.send_order('binance', 'ALPHAUSDT', 'limit', 'buy', 0.1, 442.0))
+    #order = loop.run_until_complete(crp.send_order('okx', 'PEPE-USDT-SWAP', 'limit', 'buy', 1.6343e-06, ))
     #print(order)
     #time.sleep(3)
     #df= CCXTRestApiParser.parse_get_all_orders_general('bybit',orders)
-    #pprint.pprint(orders.iloc[0])
+    #pprint.pprint(orders.iloc[0])  
     #res = asyncio.run(crp.fetch_positions('binance'))
     #df =CCXTRestApiParser.parse_fetch_position_binance(res)
     #sele = df[df['side'].notnull()]
@@ -468,7 +489,7 @@ if __name__ == '__main__':
     #res = loop.run_until_complete(crp.get_trades('bybit'))
     #print(res)
     #df = pd.json_normalize(orders['data'])
-    res = crp.ccxt_exchanges['binance'].getMarketFromSymbols(['XTZ/USDT'])
+    res = crp.ccxt_exchanges['binance'].getMarketFromSymbols(['UMAUSDT'])
     #res = loop.run_until_complete(crp.fetch_order_book('binance','TOMO/USDT'))
     #res = crp.amount_to_precision('binance', 'WOOUSDT', 74.5)
     print(res)

@@ -145,12 +145,20 @@ class TestMain:
                         price=action['price'],
                         amount=action['qty']
                     )
+                if 'status' in res:
+                    AccountData.add_order(action['ex_name'],res['orderId'],action['symbol'],action['base_asset'],action['quote_asset'],
+                                          action['action'], action['order_type'], action['price'],
+                                          0,res['status'],action['qty'],0,0,'',time.time())
             elif action['action'] == 'cancel':
                 res = await self.crp.cancel_order(
                     ex_name=action['ex_name'],
                     symbol=action['symbol'],
                     order_id=action['id'],
                 )
+                if 'status' in res:
+                    pass
+
+
         holding = AccountData.get_holding_df()
         order = AccountData.get_order_df()
         print('Holding:')

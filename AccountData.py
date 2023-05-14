@@ -109,7 +109,7 @@ class AccountData:
             cls.order_type.append(type.lower())
             cls.order_price.append(float(price))
             cls.order_avg_price.append(float(avg_price))
-            cls.order_status.append(status.lower())
+            cls.order_status.append(status.lower() if status != None else 'New')
             cls.order_original_qty.append(float(original_qty))
             cls.order_executed_qty.append(float(executed_qty))
             cls.order_fee.append(float(fee))
@@ -405,11 +405,14 @@ class AccountData:
         long_df = long_holdings[['ex_name', 'symbol', 'amount']]
         short_df = short_holdings[['ex_name', 'symbol', 'amount']]
         print("==============Long=====================")
-        print(long_df)
+        print(long_df.reset_index(inplace=True, drop=True))
         print("==============Short====================")
-        print(short_df)
+        print(short_df.reset_index(inplace=True, drop=True))
         print("=======================================")
         print(f"Long/Short ratio = {ratio} (Long={long_total}, Short={short_total})")
+        print('total pnl=', cls.total_pnl)
+        print('pf value=', cls.total_amount)
+        print('pf pnl ratio=',100.0 * cls.total_pnl / cls.total_amount if abs(cls.total_amount) != 0 else 0.0)
         print("=======================================")
         
 

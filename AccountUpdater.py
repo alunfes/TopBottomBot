@@ -571,7 +571,7 @@ class AccountUpdater:
         holding_df = AccountData.get_holding_df()
         amount = 0
         if len(holding_df) > 0:
-            amount = holding_df['price'] * holding_df['qty'].abs()
+            amount = (holding_df['price'] * holding_df['qty'].abs()).sum()
         AccountData.set_total_amount(amount)
 
         

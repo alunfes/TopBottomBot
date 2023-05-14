@@ -268,7 +268,33 @@ class CCXTRestApi:
             orders = await self.ccxt_exchanges[ex_name].fetch_orders(limit=100)
         return orders
 
-        
+    
+    async def test_send_order_binance(self, symbol, order_type:str, side:str, price, amount):
+        '''
+        need to switch to test api
+        '''
+        if price == 0:
+            book = await self.fetch_order_book('binance', symbol)
+            price = float(book['bids'][0][0]) if side == 'buy' else float(book['asks'][0][0])
+        multiplied_number = price * 0.9 if side == 'buy' else price * 1.1
+        decimal_places = len(str(price).split('.')[1])
+        rounded_number = round(multiplied_number, decimal_places)
+        self.ccxt_exchanges['binance'].set_sandbox_mode(True)  # switch to the sandbox (testnet) mode
+        response = ''
+        try:
+            response = await self.ccxt_exchanges['binance'].fapiPrivatePostOrder({'symbol': symbol,
+            'side': side,
+            'type': order_type.upper(),
+            'quantity': amount,
+            'price': rounded_number,  # ignored if 'type': 'market'
+            'timeInForce': 'GTC'})
+        except Exception as e:
+            self.ccxt_exchanges['binance'].set_sandbox_mode(False)
+            return e
+        self.ccxt_exchanges['binance'].set_sandbox_mode(False)
+        return response
+
+
 
     async def send_order(self, ex_name, symbol, order_type:str, side:str, price, amount):
         """
@@ -318,7 +344,6 @@ class CCXTRestApi:
                 raise ValueError('Invalid order type')
         except ccxt.InsufficientFunds as e:
             # 残高不足の場合はエラーを出す
-            print('Insufficient funds:', e)
             DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
                                            [e,
                                             ex_name + ':'+symbol,
@@ -329,7 +354,6 @@ class CCXTRestApi:
             return e
         except ccxt.InvalidOrder as e:
             # 注文が不正
-            print('Invalid order:', e)
             DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
                                            [e,
                                             ex_name + ':'+symbol,
@@ -339,7 +363,6 @@ class CCXTRestApi:
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'send_order', e)
             return e
         except Exception as e:
-            print('Invalid order2:', e)
             DisplayMessage.display_message('CCXTRestApi', 'send_order', 'error', 
                                            [e,
                                             ex_name + ':'+symbol,
@@ -369,8 +392,12 @@ class CCXTRestApi:
             else:
                 res = await self.ccxt_exchanges[ex_name].cancel_order(order_id, symbol)
         except Exception as e:
-            print('Cancel order eror:', e)
+            DisplayMessage.display_message('CCXTRestApi', 'cancel_order','error',
+                                           [e,
+                                            ex_name + ':'+symbol,
+                                            'order id='+str(order_id)])
             CommunicationData.add_message('Error', 'CCXTRestAPI', 'cancel_order', e)
+            return e
         return res
 
     
@@ -446,7 +473,11 @@ class CCXTRestApi:
     def amount_to_precision(self, ex_name, symbol, amount):
         #res = self.ccxt_exchanges[ex_name].amount_to_precision(symbol, amount)
         res = self.ccxt_exchanges[ex_name].amountToPrecision(symbol, amount)
-        return float(res)
+        return res
+    
+    def price_to_precision(self, ex_name, symbol, price):
+        res = self.ccxt_exchanges[ex_name].priceToPrecision(symbol, price)
+        return res
     
     async def fetch_order_book(self, ex_name, symbol):
         '''
@@ -472,7 +503,8 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     crp = CCXTRestApi()
     loop.run_until_complete(crp.initialize())
-    #order = loop.run_until_complete(crp.send_order('binance', 'ALPHAUSDT', 'limit', 'buy', 0.1, 442.0))
+    #order = loop.run_until_complete(crp.test_send_order_binance('IDUSDT', 'liit', 'buy', 0, 42.0))
+    #order = loop.run_until_complete(crp.send_order('okx', 'FLOKI-USDT-SWAP', 'limit', 'buy', 0.00003119, 18.3))
     #order = loop.run_until_complete(crp.send_order('okx', 'PEPE-USDT-SWAP', 'limit', 'buy', 1.6343e-06, ))
     #print(order)
     #time.sleep(3)
@@ -489,9 +521,10 @@ if __name__ == '__main__':
     #res = loop.run_until_complete(crp.get_trades('bybit'))
     #print(res)
     #df = pd.json_normalize(orders['data'])
-    res = crp.ccxt_exchanges['binance'].getMarketFromSymbols(['UMAUSDT'])
+    res = crp.ccxt_exchanges['okx'].getMarketFromSymbols(['FLOKI-USDT-SWAP'])
     #res = loop.run_until_complete(crp.fetch_order_book('binance','TOMO/USDT'))
-    #res = crp.amount_to_precision('binance', 'WOOUSDT', 74.5)
+    #res = crp.amount_to_precision('binance', 'BTCDOMUSDT', 0.00456789)
+    #res = crp.price_to_precision('binance', 'HOOKUSDT', 1.4062)
     print(res)
     #df = pd.DataFrame(res).transpose()
     #pprint.pprint(df[df['symbol']=='ALPHA/USDT'].iloc[0]['limits'])

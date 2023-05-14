@@ -64,12 +64,16 @@ class Strategy:
                 symbol = top['key'].split('-')[-1] if top['ex_name'] != 'okx' else top['key'].split('-')[-1].replace('USDT','')+'-USDT-SWAP'
                 base = top['key'].split('-')[-1].replace('USDT','')
                 book = await self.crp.fetch_order_book(top['ex_name'], symbol)
-                ad.add_action(action='sell', order_id='', ex_name=top['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=float(book['asks'][0][0]), qty=top['allocation_lot'])
+                price = float(book['asks'][0][0])
+                price = self.round_price_binance(top['ex_name'], symbol, price)
+                ad.add_action(action='sell', order_id='', ex_name=top['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=price, qty=top['allocation_lot'])
             for index, bottom in self.bottom_targets_df.iterrows():
                 symbol = bottom['key'].split('-')[-1] if bottom['ex_name'] != 'okx' else bottom['key'].split('-')[-1].replace('USDT','')+'-USDT-SWAP'
                 base = bottom['key'].split('-')[-1].replace('USDT','')
                 book = await self.crp.fetch_order_book(bottom['ex_name'], symbol)
-                ad.add_action(action='buy', order_id='', ex_name=bottom['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=float(book['bids'][0][0]), qty=bottom['allocation_lot'])
+                price = float(book['bids'][0][0])
+                price = self.round_price_binance(bottom['ex_name'], symbol, price)
+                ad.add_action(action='buy', order_id='', ex_name=bottom['ex_name'], symbol=symbol, base_asset=base, quote_asset='USDT', order_type='limit', price=price, qty=bottom['allocation_lot'])
             self.pf_status = 'Entry'
         elif self.pf_status == 'Entry' or self.pf_status == 'Hold': #entry in-progress or holding status
             pnl_ratio = 0.0 if AccountData.get_total_amount() > 0 else AccountData.get_total_pnl() / AccountData.get_total_amount()
@@ -163,6 +167,15 @@ class Strategy:
         self.top_targets_df = pd.DataFrame({'key':[x[0] for x in self.top_targets], 'ex_name':[x[0].split('-')[0] for x in self.top_targets], 'change_ratio':[x[1] for x in self.top_targets]})
         self.bottom_targets_df = pd.DataFrame({'key':[x[0] for x in self.bottom_targets], 'ex_name':[x[0].split('-')[0] for x in self.bottom_targets], 'change_ratio':[x[1] for x in self.bottom_targets]})
     
+    def round_price_binance(self, ex_name, symbol, price):
+        if ex_name == 'binance':
+            price = float(self.crp.price_to_precision('binance', symbol, price))
+            if 'HOOK' in symbol or 'COCOS' in symbol or symbol.replace('/','') == 'IDUSDT':
+                price = round(price, max(0, len(str(price).split('.')[-1]) - 1)) #整数はそのまま、小数点は最後の桁だけを四捨五入して桁を１つ減らす
+        return price
+
+
+
 
     async def calc_lot(self):
         async def round_lot(ex_name, symbol, lot, price):
@@ -172,15 +185,17 @@ class Strategy:
             if lot * price < Settings.min_order_amount: #amount should be larger than minimul amount
                 lot = Settings.min_order_amount / price
             precision = self.crp.amount_to_precision(ex_name, symbol, lot)
-            book = await self.crp.fetch_order_book(ex_name, symbol)
-            decimal_numbers = [bid[1] for bid in book['bids'] if isinstance(bid[1], float) and not bid[1].is_integer()]
-            decimals = np.log10(precision).astype(int)
-            new_lot = np.around(precision, decimals=2 - decimals)
+            #book = await self.crp.fetch_order_book(ex_name, symbol)
+            #decimal_numbers = [bid[1] for bid in book['bids'] if isinstance(bid[1], float) and not bid[1].is_integer()]
+            #decimals = np.log10(precision).astype(int)
+            #new_lot = np.around(precision, decimals=2 - decimals)
+            new_lot = float(precision)
             new_lot = int(new_lot) if new_lot.is_integer() else new_lot
-            if len(decimal_numbers) == 0:
-                new_lot = round(new_lot)
+            #if len(decimal_numbers) == 0:
+            #    new_lot = round(new_lot)
             if ex_name == 'okx':
                 market = self.crp.get_market_from_symbols(ex_name, symbol)
+                amount = lot * price
                 new_lot = round(new_lot / float(market['contractSize']))
             elif ex_name in 'binance':
                 '''
@@ -194,8 +209,6 @@ class Strategy:
                 '''
                 if new_lot > 1.0:
                     new_lot = round(new_lot)
-                else:
-                    print('binance order size is less than 1.0 !')
             return new_lot
 
         
